@@ -14,7 +14,7 @@ const { createBoardSchema, updateBoardSchema, idSchema } = require('../validatio
 // Protected routes
 router.post('/', validate(createBoardSchema), authMiddleware, createBoard);
 router.get('/', authMiddleware, getBoards);
-router.get('/:id', validate(idSchema), authMiddleware, getBoardById);
+router.get('/:id', authMiddleware, getBoardById);
 router.put('/:id', validate(updateBoardSchema), authMiddleware, updateBoard);
 router.delete('/:id', validate(idSchema), authMiddleware, deleteBoard);
 
