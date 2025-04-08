@@ -1,83 +1,70 @@
-const Card = require('../models/Card');
-const { getListById } = require('../services/listService');
-const { getBoardById } = require('../services/boardService');
+const Card = require('../models/cardModel');
+const { getColumnById } = require('../services/column');
+const { getBoardById } = require('../services/board');
 
-// Tạo card mới
 const createCard = async (req, res) => {
-  const { title, description, listId, position } = req.body;
-  const userId = req.user.id; // Lấy từ middleware auth
-  const token = req.header('Authorization').replace('Bearer ', '');
+  const { title, description, columnId, position, userId } = req.body;
 
   try {
-    // Kiểm tra list
-    const list = await getListById(listId, token);
-    if (!list) {
-      return res.status(404).json({ message: 'List không tồn tại' });
+    const column = await getColumnById(columnId, userId);
+    if (!column) {
+      return res.status(404).json({ message: 'Column not found' });
     }
 
-    // Kiểm tra board
-    const boardCheck = await getBoardById(list.boardId, userId, token);
-    if (boardCheck.error) {
-      return res.status(boardCheck.status).json({ message: boardCheck.error });
+    const board = await getBoardById(column.boardId, userId);
+    if (!board) {
+      return res.status(403).json({ message: 'Unauthorized or board not found' });
     }
 
-    const card = new Card({ title, description, listId, position });
+    const card = new Card({ title, description, columnId, position });
     await card.save();
+
     res.status(201).json(card);
   } catch (error) {
-    res.status(500).json({ message: 'Lỗi server', error: error.message });
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
-// Lấy tất cả cards trong list
-const getCardsByList = async (req, res) => {
-  const { listId } = req.params;
-  const userId = req.user.id;
-  const token = req.header('Authorization').replace('Bearer ', '');
+const getCardsByColumn = async (req, res) => {
+  const { columnId } = req.params;
+  const { userId } = req.body;
 
   try {
-    // Kiểm tra list
-    const list = await getListById(listId, token);
-    if (!list) {
-      return res.status(404).json({ message: 'List không tồn tại' });
+    const column = await getColumnById(columnId, userId);
+    if (!column) {
+      return res.status(404).json({ message: 'Column not found' });
     }
 
-    // Kiểm tra board
-    const boardCheck = await getBoardById(list.boardId, userId, token);
-    if (boardCheck.error) {
-      return res.status(boardCheck.status).json({ message: boardCheck.error });
+    const board = await getBoardById(column.boardId, userId);
+    if (!board) {
+      return res.status(403).json({ message: 'Unauthorized or board not found' });
     }
 
-    const cards = await Card.find({ listId }).sort({ position: 1 });
+    const cards = await Card.find({ columnId }).sort({ position: 1 });
     res.json(cards);
   } catch (error) {
-    res.status(500).json({ message: 'Lỗi server', error: error.message });
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
-// Cập nhật card
 const updateCard = async (req, res) => {
   const { id } = req.params;
-  const { title, description, position } = req.body;
-  const userId = req.user.id;
-  const token = req.header('Authorization').replace('Bearer ', '');
+  const { title, description, position, userId } = req.body;
 
   try {
     const card = await Card.findById(id);
     if (!card) {
-      return res.status(404).json({ message: 'Card không tồn tại' });
+      return res.status(404).json({ message: 'Card not found' });
     }
 
-    // Kiểm tra list
-    const list = await getListById(card.listId, token);
-    if (!list) {
-      return res.status(404).json({ message: 'List không tồn tại' });
+    const column = await getColumnById(card.columnId, userId);
+    if (!column) {
+      return res.status(404).json({ message: 'Column not found' });
     }
 
-    // Kiểm tra board
-    const boardCheck = await getBoardById(list.boardId, userId, token);
-    if (boardCheck.error) {
-      return res.status(boardCheck.status).json({ message: boardCheck.error });
+    const board = await getBoardById(column.boardId, userId);
+    if (!board) {
+      return res.status(403).json({ message: 'Unauthorized or board not found' });
     }
 
     card.title = title || card.title;
@@ -85,41 +72,38 @@ const updateCard = async (req, res) => {
     card.position = position !== undefined ? position : card.position;
     card.updatedAt = Date.now();
     await card.save();
+
     res.json(card);
   } catch (error) {
-    res.status(500).json({ message: 'Lỗi server', error: error.message });
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
-// Xóa card
 const deleteCard = async (req, res) => {
   const { id } = req.params;
-  const userId = req.user.id;
-  const token = req.header('Authorization').replace('Bearer ', '');
+  const { userId } = req.body;
 
   try {
     const card = await Card.findById(id);
     if (!card) {
-      return res.status(404).json({ message: 'Card không tồn tại' });
+      return res.status(404).json({ message: 'Card not found' });
     }
 
-    // Kiểm tra list
-    const list = await getListById(card.listId, token);
-    if (!list) {
-      return res.status(404).json({ message: 'List không tồn tại' });
+    const column = await getColumnById(card.columnId, userId);
+    if (!column) {
+      return res.status(404).json({ message: 'Column not found' });
     }
 
-    // Kiểm tra board
-    const boardCheck = await getBoardById(list.boardId, userId, token);
-    if (boardCheck.error) {
-      return res.status(boardCheck.status).json({ message: boardCheck.error });
+    const board = await getBoardById(column.boardId, userId);
+    if (!board) {
+      return res.status(403).json({ message: 'Unauthorized or board not found' });
     }
 
-    await card.remove();
-    res.json({ message: 'Đã xóa card' });
+    await card.deleteOne();
+    res.json({ message: 'Card deleted successfully' });
   } catch (error) {
-    res.status(500).json({ message: 'Lỗi server', error: error.message });
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
-module.exports = { createCard, getCardsByList, updateCard, deleteCard };
+module.exports = { createCard, getCardsByColumn, updateCard, deleteCard };

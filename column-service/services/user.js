@@ -13,14 +13,4 @@ const checkUserExists = async (userId) => {
   }
 };
 
-const checkUserExistsByEmail = async (email) => {
-  try {
-    const response = await axios.post(`${USER_SERVICE_URL}/api/users/email`, { email });
-    return response.data;
-  } catch (error) {
-    if (error.response?.status === 404) return null;
-    throw new Error('Error communicating with User Service');
-  }
-};
-
-module.exports = { checkUserExists, checkUserExistsByEmail };
+module.exports = { checkUserExists };

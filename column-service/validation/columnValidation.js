@@ -1,18 +1,15 @@
 const Joi = require('joi');
 
-const createCardSchema = Joi.object({
+const createColumnSchema = Joi.object({
   title: Joi.string().min(3).max(100).required().messages({
     'string.min': 'Title must be at least 3 characters',
     'string.max': 'Title must not exceed 100 characters',
     'any.required': 'Title is required',
   }),
-  description: Joi.string().max(500).optional().messages({
-    'string.max': 'Description must not exceed 500 characters',
-  }),
-  columnId: Joi.string().length(24).hex().required().messages({
-    'string.length': 'Column ID must be 24 characters',
-    'string.hex': 'Column ID must be a hex string',
-    'any.required': 'Column ID is required',
+  boardId: Joi.string().length(24).hex().required().messages({
+    'string.length': 'Board ID must be 24 characters',
+    'string.hex': 'Board ID must be a hex string',
+    'any.required': 'Board ID is required',
   }),
   position: Joi.number().integer().min(0).required().messages({
     'number.base': 'Position must be a number',
@@ -26,13 +23,10 @@ const createCardSchema = Joi.object({
   }),
 });
 
-const updateCardSchema = Joi.object({
+const updateColumnSchema = Joi.object({
   title: Joi.string().min(3).max(100).optional().messages({
     'string.min': 'Title must be at least 3 characters',
     'string.max': 'Title must not exceed 100 characters',
-  }),
-  description: Joi.string().max(500).optional().messages({
-    'string.max': 'Description must not exceed 500 characters',
   }),
   position: Joi.number().integer().min(0).optional().messages({
     'number.base': 'Position must be a number',
@@ -45,4 +39,4 @@ const updateCardSchema = Joi.object({
   }),
 });
 
-module.exports = { createCardSchema, updateCardSchema };
+module.exports = { createColumnSchema, updateColumnSchema };
