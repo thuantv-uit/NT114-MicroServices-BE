@@ -3,10 +3,10 @@ require('dotenv').config();
 
 const BOARD_SERVICE_URL = process.env.BOARD_SERVICE_URL || 'http://localhost:3002';
 
-const checkBoardAccess = async (boardId, userId) => {
+const checkBoardAccess = async (boardId, userId, token) => {
   try {
     const response = await axios.get(`${BOARD_SERVICE_URL}/api/boards/${boardId}`, {
-      data: { userId },
+      headers: { Authorization: `Bearer ${token}` },
     });
     return response.data;
   } catch (error) {

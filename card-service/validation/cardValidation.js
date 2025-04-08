@@ -19,11 +19,6 @@ const createCardSchema = Joi.object({
     'number.min': 'Position must be greater than or equal to 0',
     'any.required': 'Position is required',
   }),
-  userId: Joi.string().length(24).hex().required().messages({
-    'string.length': 'User ID must be 24 characters',
-    'string.hex': 'User ID must be a hex string',
-    'any.required': 'User ID is required',
-  }),
 });
 
 const updateCardSchema = Joi.object({
@@ -37,11 +32,6 @@ const updateCardSchema = Joi.object({
   position: Joi.number().integer().min(0).optional().messages({
     'number.base': 'Position must be a number',
     'number.min': 'Position must be greater than or equal to 0',
-  }),
-  userId: Joi.string().length(24).hex().required().messages({
-    'string.length': 'User ID must be 24 characters',
-    'string.hex': 'User ID must be a hex string',
-    'any.required': 'User ID is required',
   }),
 });
 

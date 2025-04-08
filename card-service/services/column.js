@@ -3,10 +3,10 @@ require('dotenv').config();
 
 const COLUMN_SERVICE_URL = process.env.COLUMN_SERVICE_URL || 'http://localhost:3003';
 
-const getColumnById = async (columnId, userId) => {
+const getColumnById = async (columnId, userId, token) => {
   try {
     const response = await axios.get(`${COLUMN_SERVICE_URL}/api/columns/${columnId}`, {
-      data: { userId },
+      headers: { Authorization: `Bearer ${token}` },
     });
     return response.data;
   } catch (error) {

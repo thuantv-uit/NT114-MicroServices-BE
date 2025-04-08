@@ -5,13 +5,14 @@ const {
   getCardsByColumn,
   updateCard,
   deleteCard,
+  authMiddleware,
 } = require('../controllers/cardController');
 const validate = require('../middleware/validate');
 const { createCardSchema, updateCardSchema } = require('../validation/cardValidation');
 
-router.post('/', validate(createCardSchema), createCard);
-router.post('/column/:columnId', getCardsByColumn);
-router.put('/:id', validate(updateCardSchema), updateCard);
-router.delete('/:id', deleteCard);
+router.post('/', authMiddleware, validate(createCardSchema), createCard);
+router.get('/column/:columnId', authMiddleware, getCardsByColumn);
+router.put('/:id', authMiddleware, validate(updateCardSchema), updateCard);
+router.delete('/:id', authMiddleware, deleteCard);
 
 module.exports = router;

@@ -3,9 +3,11 @@ require('dotenv').config();
 
 const USER_SERVICE_URL = process.env.USER_SERVICE_URL || 'http://localhost:3001';
 
-const checkUserExists = async (userId) => {
+const checkUserExists = async (userId, token) => {
   try {
-    const response = await axios.get(`${USER_SERVICE_URL}/api/users/${userId}`);
+    const response = await axios.get(`${USER_SERVICE_URL}/api/users/${userId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
     return response.data;
   } catch (error) {
     if (error.response?.status === 404) return null;
@@ -13,9 +15,13 @@ const checkUserExists = async (userId) => {
   }
 };
 
-const checkUserExistsByEmail = async (email) => {
+const checkUserExistsByEmail = async (email, token) => {
   try {
-    const response = await axios.post(`${USER_SERVICE_URL}/api/users/email`, { email });
+    const response = await axios.post(
+      `${USER_SERVICE_URL}/api/users/email`,
+      { email },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
     return response.data;
   } catch (error) {
     if (error.response?.status === 404) return null;

@@ -1,17 +1,35 @@
+const jwt = require('jsonwebtoken');
 const Card = require('../models/cardModel');
 const { getColumnById } = require('../services/column');
 const { getBoardById } = require('../services/board');
 
-const createCard = async (req, res) => {
-  const { title, description, columnId, position, userId } = req.body;
+// Middleware xác thực token
+const authMiddleware = (req, res, next) => {
+  const token = req.header('Authorization')?.replace('Bearer ', '');
+  if (!token) {
+    return res.status(401).json({ message: 'No token, authorization denied' });
+  }
 
   try {
-    const column = await getColumnById(columnId, userId);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded; // Gắn thông tin user từ token vào request
+    next();
+  } catch (error) {
+    res.status(401).json({ message: 'Token is not valid' });
+  }
+};
+
+const createCard = async (req, res) => {
+  const { title, description, columnId, position } = req.body;
+  const token = req.header('Authorization')?.replace('Bearer ', '');
+
+  try {
+    const column = await getColumnById(columnId, req.user.id, token);
     if (!column) {
       return res.status(404).json({ message: 'Column not found' });
     }
 
-    const board = await getBoardById(column.boardId, userId);
+    const board = await getBoardById(column.boardId, req.user.id, token);
     if (!board) {
       return res.status(403).json({ message: 'Unauthorized or board not found' });
     }
@@ -27,15 +45,15 @@ const createCard = async (req, res) => {
 
 const getCardsByColumn = async (req, res) => {
   const { columnId } = req.params;
-  const { userId } = req.body;
+  const token = req.header('Authorization')?.replace('Bearer ', '');
 
   try {
-    const column = await getColumnById(columnId, userId);
+    const column = await getColumnById(columnId, req.user.id, token);
     if (!column) {
       return res.status(404).json({ message: 'Column not found' });
     }
 
-    const board = await getBoardById(column.boardId, userId);
+    const board = await getBoardById(column.boardId, req.user.id, token);
     if (!board) {
       return res.status(403).json({ message: 'Unauthorized or board not found' });
     }
@@ -49,7 +67,8 @@ const getCardsByColumn = async (req, res) => {
 
 const updateCard = async (req, res) => {
   const { id } = req.params;
-  const { title, description, position, userId } = req.body;
+  const { title, description, position } = req.body;
+  const token = req.header('Authorization')?.replace('Bearer ', '');
 
   try {
     const card = await Card.findById(id);
@@ -57,12 +76,12 @@ const updateCard = async (req, res) => {
       return res.status(404).json({ message: 'Card not found' });
     }
 
-    const column = await getColumnById(card.columnId, userId);
+    const column = await getColumnById(card.columnId, req.user.id, token);
     if (!column) {
       return res.status(404).json({ message: 'Column not found' });
     }
 
-    const board = await getBoardById(column.boardId, userId);
+    const board = await getBoardById(column.boardId, req.user.id, token);
     if (!board) {
       return res.status(403).json({ message: 'Unauthorized or board not found' });
     }
@@ -81,7 +100,7 @@ const updateCard = async (req, res) => {
 
 const deleteCard = async (req, res) => {
   const { id } = req.params;
-  const { userId } = req.body;
+  const token = req.header('Authorization')?.replace('Bearer ', '');
 
   try {
     const card = await Card.findById(id);
@@ -89,12 +108,12 @@ const deleteCard = async (req, res) => {
       return res.status(404).json({ message: 'Card not found' });
     }
 
-    const column = await getColumnById(card.columnId, userId);
+    const column = await getColumnById(card.columnId, req.user.id, token);
     if (!column) {
       return res.status(404).json({ message: 'Column not found' });
     }
 
-    const board = await getBoardById(column.boardId, userId);
+    const board = await getBoardById(column.boardId, req.user.id, token);
     if (!board) {
       return res.status(403).json({ message: 'Unauthorized or board not found' });
     }
@@ -106,4 +125,4 @@ const deleteCard = async (req, res) => {
   }
 };
 
-module.exports = { createCard, getCardsByColumn, updateCard, deleteCard };
+module.exports = { createCard, getCardsByColumn, updateCard, deleteCard, authMiddleware };

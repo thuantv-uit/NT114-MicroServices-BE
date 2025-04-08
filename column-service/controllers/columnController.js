@@ -1,17 +1,35 @@
+const jwt = require('jsonwebtoken');
 const Column = require('../models/columnModel');
 const { checkUserExists } = require('../services/user');
 const { checkBoardAccess } = require('../services/board');
 
-const createColumn = async (req, res) => {
-  const { title, boardId, position, userId } = req.body;
+// Middleware xác thực token
+const authMiddleware = (req, res, next) => {
+  const token = req.header('Authorization')?.replace('Bearer ', '');
+  if (!token) {
+    return res.status(401).json({ message: 'No token, authorization denied' });
+  }
 
   try {
-    const user = await checkUserExists(userId);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded; // Gắn thông tin user từ token vào request
+    next();
+  } catch (error) {
+    res.status(401).json({ message: 'Token is not valid' });
+  }
+};
+
+const createColumn = async (req, res) => {
+  const { title, boardId, position } = req.body;
+  const token = req.header('Authorization')?.replace('Bearer ', ''); // Lấy token từ header
+
+  try {
+    const user = await checkUserExists(req.user.id, token);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    const board = await checkBoardAccess(boardId, userId);
+    const board = await checkBoardAccess(boardId, req.user.id, token);
     if (!board) {
       return res.status(403).json({ message: 'Unauthorized or board not found' });
     }
@@ -27,15 +45,15 @@ const createColumn = async (req, res) => {
 
 const getColumnsByBoard = async (req, res) => {
   const { boardId } = req.params;
-  const { userId } = req.body;
+  const token = req.header('Authorization')?.replace('Bearer ', '');
 
   try {
-    const user = await checkUserExists(userId);
+    const user = await checkUserExists(req.user.id, token);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    const board = await checkBoardAccess(boardId, userId);
+    const board = await checkBoardAccess(boardId, req.user.id, token);
     if (!board) {
       return res.status(403).json({ message: 'Unauthorized or board not found' });
     }
@@ -49,7 +67,7 @@ const getColumnsByBoard = async (req, res) => {
 
 const getColumnById = async (req, res) => {
   const { id } = req.params;
-  const { userId } = req.body;
+  const token = req.header('Authorization')?.replace('Bearer ', '');
 
   try {
     const column = await Column.findById(id);
@@ -57,12 +75,12 @@ const getColumnById = async (req, res) => {
       return res.status(404).json({ message: 'Column not found' });
     }
 
-    const user = await checkUserExists(userId);
+    const user = await checkUserExists(req.user.id, token);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    const board = await checkBoardAccess(column.boardId, userId);
+    const board = await checkBoardAccess(column.boardId, req.user.id, token);
     if (!board) {
       return res.status(403).json({ message: 'Unauthorized or board not found' });
     }
@@ -74,8 +92,9 @@ const getColumnById = async (req, res) => {
 };
 
 const updateColumn = async (req, res) => {
-  const { title, position, userId } = req.body;
+  const { title, position } = req.body;
   const { id } = req.params;
+  const token = req.header('Authorization')?.replace('Bearer ', '');
 
   try {
     const column = await Column.findById(id);
@@ -83,12 +102,12 @@ const updateColumn = async (req, res) => {
       return res.status(404).json({ message: 'Column not found' });
     }
 
-    const user = await checkUserExists(userId);
+    const user = await checkUserExists(req.user.id, token);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    const board = await checkBoardAccess(column.boardId, userId);
+    const board = await checkBoardAccess(column.boardId, req.user.id, token);
     if (!board) {
       return res.status(403).json({ message: 'Unauthorized or board not found' });
     }
@@ -106,7 +125,7 @@ const updateColumn = async (req, res) => {
 
 const deleteColumn = async (req, res) => {
   const { id } = req.params;
-  const { userId } = req.body;
+  const token = req.header('Authorization')?.replace('Bearer ', '');
 
   try {
     const column = await Column.findById(id);
@@ -114,12 +133,12 @@ const deleteColumn = async (req, res) => {
       return res.status(404).json({ message: 'Column not found' });
     }
 
-    const user = await checkUserExists(userId);
+    const user = await checkUserExists(req.user.id, token);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    const board = await checkBoardAccess(column.boardId, userId);
+    const board = await checkBoardAccess(column.boardId, req.user.id, token);
     if (!board) {
       return res.status(403).json({ message: 'Unauthorized or board not found' });
     }
@@ -131,4 +150,4 @@ const deleteColumn = async (req, res) => {
   }
 };
 
-module.exports = { createColumn, getColumnsByBoard, getColumnById, updateColumn, deleteColumn };
+module.exports = { createColumn, getColumnsByBoard, getColumnById, updateColumn, deleteColumn, authMiddleware };

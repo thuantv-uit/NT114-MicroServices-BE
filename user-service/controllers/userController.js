@@ -1,3 +1,4 @@
+const jwt = require('jsonwebtoken');
 const User = require('../models/userModel');
 
 const registerUser = async (req, res) => {
@@ -29,17 +30,41 @@ const loginUser = async (req, res) => {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
 
+    // Tạo JWT token
+    const token = jwt.sign(
+      { id: user._id, email: user.email },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' } // Token hết hạn sau 1 giờ
+    );
+
     res.json({
       user: { id: user._id, username: user.username, email },
+      token, // Trả về token
     });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
+// Middleware để xác thực token
+const authMiddleware = (req, res, next) => {
+  const token = req.header('Authorization')?.replace('Bearer ', '');
+  if (!token) {
+    return res.status(401).json({ message: 'No token, authorization denied' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded; // Gắn thông tin user từ token vào request
+    next();
+  } catch (error) {
+    res.status(401).json({ message: 'Token is not valid' });
+  }
+};
+
 const getCurrentUser = async (req, res) => {
   try {
-    const user = await User.findById(req.body.userId).select('-password');
+    const user = await User.findById(req.user.id).select('-password');
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -91,4 +116,5 @@ module.exports = {
   getUserById,
   getAllUsers,
   getUserByEmail,
+  authMiddleware,
 };

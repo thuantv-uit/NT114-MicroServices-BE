@@ -9,11 +9,6 @@ const createBoardSchema = Joi.object({
   description: Joi.string().max(500).optional().messages({
     'string.max': 'Description must not exceed 500 characters',
   }),
-  userId: Joi.string().length(24).hex().required().messages({
-    'string.length': 'User ID must be 24 characters',
-    'string.hex': 'User ID must be a hex string',
-    'any.required': 'User ID is required',
-  }),
   memberIds: Joi.array().items(Joi.string().length(24).hex()).optional().messages({
     'array.base': 'MemberIds must be an array',
     'string.length': 'Each memberId must be 24 characters',
@@ -28,11 +23,6 @@ const updateBoardSchema = Joi.object({
   }),
   description: Joi.string().max(500).optional().messages({
     'string.max': 'Description must not exceed 500 characters',
-  }),
-  userId: Joi.string().length(24).hex().required().messages({
-    'string.length': 'User ID must be 24 characters',
-    'string.hex': 'User ID must be a hex string',
-    'any.required': 'User ID is required',
   }),
   memberIds: Joi.array().items(Joi.string().length(24).hex()).optional().messages({
     'array.base': 'MemberIds must be an array',
@@ -50,11 +40,6 @@ const inviteUserSchema = Joi.object({
   email: Joi.string().email().required().messages({
     'string.email': 'Invalid email format',
     'any.required': 'Email is required',
-  }),
-  userId: Joi.string().length(24).hex().required().messages({
-    'string.length': 'User ID must be 24 characters',
-    'string.hex': 'User ID must be a hex string',
-    'any.required': 'User ID is required',
   }),
 });
 

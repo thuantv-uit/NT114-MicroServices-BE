@@ -1,11 +1,29 @@
+const jwt = require('jsonwebtoken');
 const Board = require('../models/boardModel');
 const { checkUserExists, checkUserExistsByEmail } = require('../services/userService');
 
-const createBoard = async (req, res) => {
-  const { title, description, userId, memberIds } = req.body;
+// Middleware xác thực token
+const authMiddleware = (req, res, next) => {
+  const token = req.header('Authorization')?.replace('Bearer ', '');
+  if (!token) {
+    return res.status(401).json({ message: 'No token, authorization denied' });
+  }
 
   try {
-    const user = await checkUserExists(userId);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded; // Gắn thông tin user từ token vào request
+    next();
+  } catch (error) {
+    res.status(401).json({ message: 'Token is not valid' });
+  }
+};
+
+const createBoard = async (req, res) => {
+  const { title, description, memberIds } = req.body;
+  const token = req.header('Authorization')?.replace('Bearer ', ''); // Lấy token từ header
+
+  try {
+    const user = await checkUserExists(req.user.id, token); // Truyền token
     if (!user) {
       return res.status(404).json({ message: 'User not found in User Service' });
     }
@@ -13,7 +31,7 @@ const createBoard = async (req, res) => {
     const board = new Board({
       title,
       description,
-      userId,
+      userId: req.user.id,
       memberIds: memberIds || [],
     });
     await board.save();
@@ -25,16 +43,16 @@ const createBoard = async (req, res) => {
 };
 
 const getBoards = async (req, res) => {
-  const { userId } = req.body;
+  const token = req.header('Authorization')?.replace('Bearer ', ''); // Lấy token từ header
 
   try {
-    const user = await checkUserExists(userId);
+    const user = await checkUserExists(req.user.id, token); // Truyền token
     if (!user) {
       return res.status(404).json({ message: 'User not found in User Service' });
     }
 
     const boards = await Board.find({
-      $or: [{ userId }, { memberIds: userId }],
+      $or: [{ userId: req.user.id }, { memberIds: req.user.id }],
     });
     res.json(boards);
   } catch (error) {
@@ -42,8 +60,26 @@ const getBoards = async (req, res) => {
   }
 };
 
+// const getBoardById = async (req, res) => {
+//   const { id } = req.params;
+
+//   try {
+//     const board = await Board.findById(id);
+//     if (!board) {
+//       return res.status(404).json({ message: 'Board not found' });
+//     }
+
+//     if (board.userId.toString() !== req.user.id && !board.memberIds.includes(req.user.id)) {
+//       return res.status(403).json({ message: 'Unauthorized' });
+//     }
+
+//     res.json(board);
+//   } catch (error) {
+//     res.status(500).json({ message: 'Server error', error: error.message });
+//   }
+// };
+
 const getBoardById = async (req, res) => {
-  const { userId } = req.body;
   const { id } = req.params;
 
   try {
@@ -51,11 +87,11 @@ const getBoardById = async (req, res) => {
     if (!board) {
       return res.status(404).json({ message: 'Board not found' });
     }
-
-    if (board.userId.toString() !== userId && !board.memberIds.includes(userId)) {
+    const isOwner = board.userId.toString() === req.user.id;
+    const isMember = board.memberIds.map(id => id.toString()).includes(req.user.id);
+    if (!isOwner && !isMember) {
       return res.status(403).json({ message: 'Unauthorized' });
     }
-
     res.json(board);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -63,7 +99,7 @@ const getBoardById = async (req, res) => {
 };
 
 const updateBoard = async (req, res) => {
-  const { title, description, memberIds, userId } = req.body;
+  const { title, description, memberIds } = req.body;
   const { id } = req.params;
 
   try {
@@ -72,7 +108,7 @@ const updateBoard = async (req, res) => {
       return res.status(404).json({ message: 'Board not found' });
     }
 
-    if (board.userId.toString() !== userId) {
+    if (board.userId.toString() !== req.user.id) {
       return res.status(403).json({ message: 'Unauthorized' });
     }
 
@@ -89,7 +125,6 @@ const updateBoard = async (req, res) => {
 };
 
 const deleteBoard = async (req, res) => {
-  const { userId } = req.body;
   const { id } = req.params;
 
   try {
@@ -98,7 +133,7 @@ const deleteBoard = async (req, res) => {
       return res.status(404).json({ message: 'Board not found' });
     }
 
-    if (board.userId.toString() !== userId) {
+    if (board.userId.toString() !== req.user.id) {
       return res.status(403).json({ message: 'Unauthorized' });
     }
 
@@ -109,32 +144,61 @@ const deleteBoard = async (req, res) => {
   }
 };
 
+// const inviteUserToBoard = async (req, res) => {
+//   const { boardId, email } = req.body;
+//   const token = req.header('Authorization')?.replace('Bearer ', ''); // Lấy token từ header
+
+//   try {
+//     const board = await Board.findById(boardId);
+//     if (!board) {
+//       return res.status(404).json({ message: 'Board not found' });
+//     }
+
+//     if (board.userId.toString() !== req.user.id) {
+//       return res.status(403).json({ message: 'Unauthorized' });
+//     }
+
+//     const userResponse = await checkUserExistsByEmail(email, token); // Truyền token
+//     if (!userResponse) {
+//       return res.status(404).json({ message: 'User not found by email' });
+//     }
+
+//     const invitedUserId = userResponse._id;
+//     if (board.memberIds.includes(invitedUserId)) {
+//       return res.status(400).json({ message: 'User is already a member of this board' });
+//     }
+
+//     board.memberIds.push(invitedUserId);
+//     await board.save();
+
+//     res.status(200).json({ message: 'User invited successfully', board });
+//   } catch (error) {
+//     res.status(500).json({ message: 'Server error', error: error.message });
+//   }
+// };
+
 const inviteUserToBoard = async (req, res) => {
-  const { boardId, email, userId } = req.body;
+  const { boardId, email } = req.body;
+  const token = req.header('Authorization')?.replace('Bearer ', '');
 
   try {
     const board = await Board.findById(boardId);
     if (!board) {
       return res.status(404).json({ message: 'Board not found' });
     }
-
-    if (board.userId.toString() !== userId) {
+    if (board.userId.toString() !== req.user.id) {
       return res.status(403).json({ message: 'Unauthorized' });
     }
-
-    const userResponse = await checkUserExistsByEmail(email);
+    const userResponse = await checkUserExistsByEmail(email, token);
     if (!userResponse) {
       return res.status(404).json({ message: 'User not found by email' });
     }
-
     const invitedUserId = userResponse._id;
     if (board.memberIds.includes(invitedUserId)) {
       return res.status(400).json({ message: 'User is already a member of this board' });
     }
-
     board.memberIds.push(invitedUserId);
     await board.save();
-
     res.status(200).json({ message: 'User invited successfully', board });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -148,4 +212,5 @@ module.exports = {
   updateBoard,
   deleteBoard,
   inviteUserToBoard,
+  authMiddleware,
 };
