@@ -4,7 +4,7 @@
 This project is a task management system built using a **microservice architecture**, with **Node.js** as the primary programming language and **MongoDB** as the database. The system consists of 4 main services: **User**, **Board**, **Column**, and **Card**, each running on a separate port.
 
 ### Author Information
-- **Author**: Trần Văn Thuận  
+- **Author**: Thuan Tran Van  
 - **Created Date**: April 09, 2025  
 
 ---
