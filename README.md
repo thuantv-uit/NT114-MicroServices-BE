@@ -55,9 +55,9 @@ The project is divided into 4 independent microservices:
 
 ### 1. Clone the Repository
 
-git clone <repository-url>
 ```bash
-cd <project-folder>
+git clone https://github.com/thuan410/NT114_MicroServices_BE.git
+cd NT114_MicroServices_BE
 ```
 
 ### 2. Install Dependencies for Each Service
