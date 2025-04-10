@@ -4,7 +4,8 @@
     "description": "List Service for Trello-like app",
     "main": "app.js",
     "scripts": {
-        "start": "node app.js"
+        "start": "node app.js",
+        "build": "mkdir -p dist && cp -r *.js package.json dist/"
     },
     "dependencies": {
         "axios": "^1.6.0",
