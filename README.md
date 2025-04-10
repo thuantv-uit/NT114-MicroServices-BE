@@ -52,28 +52,34 @@ The project is divided into 4 independent microservices:
 
 ## Installation and Setup
 
+
 ### 1. Clone the Repository
-```bash
+
 git clone <repository-url>
 cd <project-folder>
 
 ### 2. Install Dependencies for Each Service
+
 npm install
 
 ### 3. Configure Environment Variables
+
 PORT=<port_number>  # 3001 for user, 3002 for board, etc.
 MONGODB_URI=<your_mongodb_connection_string>
 
 ### 4. Start MongoDB
+
 mongod
 
 ### 5. Run Each Service
+
 cd user && npm start
 cd board && npm start
 cd column && npm start
 cd card && npm start
 
-Usage
+### Usage
+
 Access each service via their respective ports:
 User Service: http://localhost:3001
 Board Service: http://localhost:3002
@@ -81,7 +87,8 @@ Column Service: http://localhost:3003
 Card Service: http://localhost:3004
 Use the APIs defined in each service to interact with the system.
 
-Feedback and Contact
+### Feedback and Contact
+
 If you have any questions or suggestions, feel free to reach out to the author:
 
 Email: 22521448@gm.uit.edu.vn
