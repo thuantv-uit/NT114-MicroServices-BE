@@ -56,27 +56,37 @@ The project is divided into 4 independent microservices:
 ### 1. Clone the Repository
 
 git clone <repository-url>
+```bash
 cd <project-folder>
+```
 
 ### 2. Install Dependencies for Each Service
 
+```bash
 npm install
+```
 
 ### 3. Configure Environment Variables
 
+```bash
 PORT=<port_number>  # 3001 for user, 3002 for board, etc.
 MONGODB_URI=<your_mongodb_connection_string>
+```
 
 ### 4. Start MongoDB
 
+```bash
 mongod
+```
 
 ### 5. Run Each Service
 
+```bash
 cd user && npm start
 cd board && npm start
 cd column && npm start
 cd card && npm start
+```
 
 ### Usage
 
