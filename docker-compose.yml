@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  # Microservice: card
+  card:
+    image: card:v1
+    ports:
+      - "3004:3004"
+    environment:
+      - MONGO_URI=mongodb://mongodb:27017/card_db
+    depends_on:
+      - mongodb
+    networks:
+      - app-network
+
+  # Microservice: column
+  column:
+    image: column:v1
+    ports:
+      - "3003:3003"
+    environment:
+      - MONGO_URI=mongodb://mongodb:27017/column_db
+    depends_on:
+      - mongodb
+    networks:
+      - app-network
+
+  # Microservice: board
+  board:
+    image: board:v1
+    ports:
+      - "3002:3002"
+    environment:
+      - MONGO_URI=mongodb://mongodb:27017/board_db
+    depends_on:
+      - mongodb
+    networks:
+      - app-network
+
+  # Microservice: user
+  user:
+    image: user:v1
+    ports:
+      - "3001:3001"
+    environment:
+      - MONGO_URI=mongodb://mongodb:27017/user_db
+    depends_on:
+      - mongodb
+    networks:
+      - app-network
+
+  # MongoDB database
+  mongodb:
+    image: mongodb/mongodb-community-server:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - app-network
+
+# Định nghĩa volume để lưu trữ dữ liệu MongoDB
+volumes:
+  mongodb_data:
+
+# Định nghĩa network để các container giao tiếp với nhau
+networks:
+  app-network:
+    driver: bridge
