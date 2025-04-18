@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const Card = require('../models/cardModel');
-const { getColumnById } = require('../services/column');
+// const { getColumnById } = require('../services/column');
+const { getColumnById, updateColumnCardOrder } = require('../services/column'); // Thêm updateColumnCardOrder
 const { getBoardById } = require('../services/board');
 
 // Middleware xác thực token
@@ -36,6 +37,9 @@ const createCard = async (req, res) => {
 
     const card = new Card({ title, description, columnId, position });
     await card.save();
+
+    // Thêm card._id vào cardOrderIds của column
+    await updateColumnCardOrder(columnId, card._id, token);
 
     res.status(201).json(card);
   } catch (error) {

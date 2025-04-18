@@ -15,4 +15,17 @@ const checkBoardAccess = async (boardId, userId, token) => {
   }
 };
 
-module.exports = { checkBoardAccess };
+const updateBoardColumnOrder = async (boardId, _id, token) => {
+  try {
+    const response = await axios.put(
+      `${BOARD_SERVICE_URL}/api/boards/${boardId}`,
+      { columnOrderIds: { $push: _id } },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    return response.data;
+  } catch (error) {
+    throw new Error('Error communicating with list columnOrderIds: ' + error.message);
+  }
+};
+
+module.exports = { checkBoardAccess, updateBoardColumnOrder };

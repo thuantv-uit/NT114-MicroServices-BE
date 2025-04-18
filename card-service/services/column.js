@@ -15,4 +15,17 @@ const getColumnById = async (columnId, userId, token) => {
   }
 };
 
-module.exports = { getColumnById };
+const updateColumnCardOrder = async (columnId, cardId, token) => {
+  try {
+    const response = await axios.put(
+      `${COLUMN_SERVICE_URL}/api/columns/${columnId}`,
+      { cardOrderIds: { $push: cardId } },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    return response.data;
+  } catch (error) {
+    throw new Error(`Error updating cardOrderIds for column ${columnId}: ${error.message}`);
+  }
+};
+
+module.exports = { getColumnById, updateColumnCardOrder };
