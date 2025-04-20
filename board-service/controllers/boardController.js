@@ -1,55 +1,83 @@
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const Board = require('../models/boardModel');
-const { checkUserExists, checkUserExistsByEmail } = require('../services/userService');
+const { checkUserExists, checkUserExistsByEmail } = require('../services/user');
+const { extractToken, throwError, isValidObjectId } = require('../utils/helpers');
+const { STATUS_CODES, ERROR_MESSAGES } = require('../utils/constants');
 
-// Middleware xác thực token
 const authMiddleware = (req, res, next) => {
-  const token = req.header('Authorization')?.replace('Bearer ', '');
+  const token = extractToken(req);
   if (!token) {
-    return res.status(401).json({ message: 'Không có token, từ chối quyền truy cập' });
+    throwError(ERROR_MESSAGES.NO_TOKEN, STATUS_CODES.UNAUTHORIZED);
   }
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded; // Gắn thông tin người dùng từ token vào request
+    req.user = decoded;
     next();
   } catch (error) {
-    res.status(401).json({ message: 'Token không hợp lệ' });
+    throwError(ERROR_MESSAGES.INVALID_TOKEN, STATUS_CODES.UNAUTHORIZED);
   }
 };
 
+const validateUserAndBoardAccess = async (boardId, userId, token, checkOwnership = false) => {
+  if (!isValidObjectId(boardId)) {
+    throwError(ERROR_MESSAGES.INVALID_BOARD_ID, STATUS_CODES.BAD_REQUEST);
+  }
+
+  const board = await Board.findById(boardId);
+  if (!board) {
+    throwError(ERROR_MESSAGES.BOARD_NOT_FOUND, STATUS_CODES.NOT_FOUND);
+  }
+
+  const isOwner = board.userId.toString() === userId;
+  const isMember = board.memberIds.map(id => id.toString()).includes(userId);
+
+  if (checkOwnership && !isOwner) {
+    throwError(ERROR_MESSAGES.UNAUTHORIZED, STATUS_CODES.FORBIDDEN);
+  } else if (!checkOwnership && !isOwner && !isMember) {
+    throwError(ERROR_MESSAGES.UNAUTHORIZED, STATUS_CODES.FORBIDDEN);
+  }
+
+  return board;
+};
+
 const createBoard = async (req, res) => {
-  const { title, description, memberIds, columnOrderIds } = req.body;
-  const token = req.header('Authorization')?.replace('Bearer ', ''); // Lấy token từ header
+  const { title, description, memberIds = [], columnOrderIds = [] } = req.body;
+  const token = extractToken(req);
 
   try {
-    const user = await checkUserExists(req.user.id, token); // Truyền token
+    const user = await checkUserExists(req.user.id, token);
     if (!user) {
-      return res.status(404).json({ message: 'Không tìm thấy người dùng trong Dịch vụ Người dùng' });
+      throwError(ERROR_MESSAGES.USER_NOT_FOUND, STATUS_CODES.NOT_FOUND);
+    }
+
+    if (memberIds.some(id => !isValidObjectId(id)) || columnOrderIds.some(id => !isValidObjectId(id))) {
+      throwError(ERROR_MESSAGES.INVALID_ID, STATUS_CODES.BAD_REQUEST);
     }
 
     const board = new Board({
       title,
       description,
       userId: req.user.id,
-      memberIds: memberIds || [],
-      columnOrderIds: columnOrderIds || [], // Khởi tạo columnOrderIds
+      memberIds,
+      columnOrderIds,
     });
     await board.save();
 
-    res.status(201).json(board);
+    res.status(STATUS_CODES.CREATED).json(board);
   } catch (error) {
-    res.status(500).json({ message: 'Lỗi server', error: error.message });
+    throwError(error.message || ERROR_MESSAGES.SERVER_ERROR, STATUS_CODES.INTERNAL_SERVER_ERROR);
   }
 };
 
 const getBoards = async (req, res) => {
-  const token = req.header('Authorization')?.replace('Bearer ', ''); // Lấy token từ header
+  const token = extractToken(req);
 
   try {
-    const user = await checkUserExists(req.user.id, token); // Truyền token
+    const user = await checkUserExists(req.user.id, token);
     if (!user) {
-      return res.status(404).json({ message: 'Không tìm thấy người dùng trong Dịch vụ Người dùng' });
+      throwError(ERROR_MESSAGES.USER_NOT_FOUND, STATUS_CODES.NOT_FOUND);
     }
 
     const boards = await Board.find({
@@ -57,111 +85,88 @@ const getBoards = async (req, res) => {
     });
     res.json(boards);
   } catch (error) {
-    res.status(500).json({ message: 'Lỗi server', error: error.message });
+    throwError(error.message || ERROR_MESSAGES.SERVER_ERROR, STATUS_CODES.INTERNAL_SERVER_ERROR);
   }
 };
 
 const getBoardById = async (req, res) => {
   const { id } = req.params;
+  const token = extractToken(req);
 
-  try {
-    const board = await Board.findById(id);
-    if (!board) {
-      return res.status(404).json({ message: 'Không tìm thấy bảng' });
-    }
-    const isOwner = board.userId.toString() === req.user.id;
-    const isMember = board.memberIds.map(id => id.toString()).includes(req.user.id);
-    if (!isOwner && !isMember) {
-      return res.status(403).json({ message: 'Không có quyền truy cập' });
-    }
-    res.json(board);
-  } catch (error) {
-    res.status(500).json({ message: 'Lỗi server', error: error.message });
-  }
+  const board = await validateUserAndBoardAccess(id, req.user.id, token);
+  res.json(board);
 };
 
 const updateBoard = async (req, res) => {
-  const { title, description, memberIds, columnOrderIds } = req.body;
   const { id } = req.params;
+  const { title, description, memberIds, columnOrderIds } = req.body;
+  const token = extractToken(req);
+
+  const board = await validateUserAndBoardAccess(id, req.user.id, token, true);
 
   try {
-    const board = await Board.findById(id);
-    if (!board) {
-      return res.status(404).json({ message: 'Không tìm thấy bảng' });
-    }
-
-    if (board.userId.toString() !== req.user.id) {
-      return res.status(403).json({ message: 'Không có quyền truy cập' });
-    }
-
-    // Cập nhật các trường nếu được cung cấp
     if (title) board.title = title;
     if (description) board.description = description;
-    if (memberIds) board.memberIds = memberIds;
-    
-    // Xử lý cập nhật columnOrderIds
-    if (columnOrderIds && columnOrderIds.$push) {
-      // Thêm một columnId vào mảng columnOrderIds
-      board.columnOrderIds.push(columnOrderIds.$push);
-    } else if (Array.isArray(columnOrderIds)) {
-      // Thay thế toàn bộ mảng columnOrderIds nếu được gửi dưới dạng mảng
-      board.columnOrderIds = columnOrderIds;
+    if (memberIds) {
+      if (memberIds.some(id => !isValidObjectId(id))) {
+        throwError(ERROR_MESSAGES.INVALID_ID, STATUS_CODES.BAD_REQUEST);
+      }
+      board.memberIds = memberIds;
+    }
+    if (columnOrderIds) {
+      if (columnOrderIds.$push) {
+        if (!isValidObjectId(columnOrderIds.$push)) {
+          throwError(ERROR_MESSAGES.INVALID_ID, STATUS_CODES.BAD_REQUEST);
+        }
+        board.columnOrderIds.push(columnOrderIds.$push);
+      } else if (Array.isArray(columnOrderIds)) {
+        if (columnOrderIds.some(id => !isValidObjectId(id))) {
+          throwError(ERROR_MESSAGES.INVALID_ID, STATUS_CODES.BAD_REQUEST);
+        }
+        board.columnOrderIds = columnOrderIds;
+      }
     }
 
-    board.updatedAt = Date.now();
     await board.save();
-
     res.json(board);
   } catch (error) {
-    res.status(500).json({ message: 'Lỗi server', error: error.message });
+    throwError(error.message || ERROR_MESSAGES.SERVER_ERROR, STATUS_CODES.INTERNAL_SERVER_ERROR);
   }
 };
 
 const deleteBoard = async (req, res) => {
   const { id } = req.params;
+  const token = extractToken(req);
 
-  try {
-    const board = await Board.findById(id);
-    if (!board) {
-      return res.status(404).json({ message: 'Không tìm thấy bảng' });
-    }
+  const board = await validateUserAndBoardAccess(id, req.user.id, token, true);
 
-    if (board.userId.toString() !== req.user.id) {
-      return res.status(403).json({ message: 'Không có quyền truy cập' });
-    }
-
-    await board.deleteOne();
-    res.json({ message: 'Xóa bảng thành công' });
-  } catch (error) {
-    res.status(500).json({ message: 'Lỗi server', error: error.message });
-  }
+  await board.deleteOne();
+  res.json({ message: ERROR_MESSAGES.BOARD_DELETED });
 };
 
 const inviteUserToBoard = async (req, res) => {
   const { boardId, email } = req.body;
-  const token = req.header('Authorization')?.replace('Bearer ', '');
+  const token = extractToken(req);
+
+  const board = await validateUserAndBoardAccess(boardId, req.user.id, token, true);
 
   try {
-    const board = await Board.findById(boardId);
-    if (!board) {
-      return res.status(404).json({ message: 'Không tìm thấy bảng' });
-    }
-    if (board.userId.toString() !== req.user.id) {
-      return res.status(403).json({ message: 'Không có quyền truy cập' });
-    }
     const userResponse = await checkUserExistsByEmail(email, token);
     if (!userResponse) {
-      return res.status(404).json({ message: 'Không tìm thấy người dùng theo email' });
+      throwError(ERROR_MESSAGES.USER_NOT_FOUND_BY_EMAIL, STATUS_CODES.NOT_FOUND);
     }
+
     const invitedUserId = userResponse._id;
     if (board.memberIds.includes(invitedUserId)) {
-      return res.status(400).json({ message: 'Người dùng đã là thành viên của bảng này' });
+      throwError(ERROR_MESSAGES.USER_ALREADY_MEMBER, STATUS_CODES.BAD_REQUEST);
     }
+
     board.memberIds.push(invitedUserId);
     await board.save();
-    res.status(200).json({ message: 'Mời người dùng thành công', board });
+
+    res.status(STATUS_CODES.OK).json({ message: ERROR_MESSAGES.USER_INVITED, board });
   } catch (error) {
-    res.status(500).json({ message: 'Lỗi server', error: error.message });
+    throwError(error.message || ERROR_MESSAGES.SERVER_ERROR, STATUS_CODES.INTERNAL_SERVER_ERROR);
   }
 };
 

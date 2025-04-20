@@ -10,13 +10,18 @@ const {
   authMiddleware,
 } = require('../controllers/boardController');
 const validate = require('../middleware/validate');
+const errorHandler = require('../middleware/errorHandler');
 const { createBoardSchema, updateBoardSchema, inviteUserSchema } = require('../validation/boardValidation');
 
-router.post('/', authMiddleware, validate(createBoardSchema), createBoard);
-router.get('/list', authMiddleware, getBoards);
-router.get('/:id', authMiddleware, getBoardById);
-router.put('/:id', authMiddleware, validate(updateBoardSchema), updateBoard);
-router.delete('/:id', authMiddleware, deleteBoard);
-router.post('/invite', authMiddleware, validate(inviteUserSchema), inviteUserToBoard);
+router.use(authMiddleware);
+
+router.post('/', validate(createBoardSchema), createBoard);
+router.get('/list', getBoards);
+router.get('/:id', getBoardById);
+router.put('/:id', validate(updateBoardSchema), updateBoard);
+router.delete('/:id', deleteBoard);
+router.post('/invite', validate(inviteUserSchema), inviteUserToBoard);
+
+router.use(errorHandler);
 
 module.exports = router;
