@@ -1,5 +1,7 @@
 const axios = require('axios');
 require('dotenv').config();
+const { throwError } = require('../utils/helpers');
+const { STATUS_CODES, ERROR_MESSAGES } = require('../utils/constants');
 
 const COLUMN_SERVICE_URL = process.env.COLUMN_SERVICE_URL || 'http://localhost:3003';
 
@@ -10,8 +12,10 @@ const getColumnById = async (columnId, userId, token) => {
     });
     return response.data;
   } catch (error) {
-    if (error.response?.status === 404 || error.response?.status === 403) return null;
-    throw new Error('Error communicating with Column Service');
+    if (error.response?.status === 404 || error.response?.status === 403) {
+      return null;
+    }
+    throwError(ERROR_MESSAGES.COLUMN_SERVICE_ERROR, STATUS_CODES.INTERNAL_SERVER_ERROR);
   }
 };
 
@@ -24,7 +28,7 @@ const updateColumnCardOrder = async (columnId, cardId, token) => {
     );
     return response.data;
   } catch (error) {
-    throw new Error(`Error updating cardOrderIds for column ${columnId}: ${error.message}`);
+    throwError(`${ERROR_MESSAGES.COLUMN_UPDATE_ERROR}: ${error.message}`, STATUS_CODES.INTERNAL_SERVER_ERROR);
   }
 };
 

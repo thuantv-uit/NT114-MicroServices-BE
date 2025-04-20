@@ -1,132 +1,96 @@
 const jwt = require('jsonwebtoken');
 const Card = require('../models/cardModel');
-// const { getColumnById } = require('../services/column');
-const { getColumnById, updateColumnCardOrder } = require('../services/column'); // Thêm updateColumnCardOrder
+const { getColumnById, updateColumnCardOrder } = require('../services/column');
 const { getBoardById } = require('../services/board');
+const { extractToken, throwError } = require('../utils/helpers');
+const { STATUS_CODES, ERROR_MESSAGES } = require('../utils/constants');
 
-// Middleware xác thực token
 const authMiddleware = (req, res, next) => {
-  const token = req.header('Authorization')?.replace('Bearer ', '');
+  const token = extractToken(req);
   if (!token) {
-    return res.status(401).json({ message: 'No token, authorization denied' });
+    throwError(ERROR_MESSAGES.NO_TOKEN, STATUS_CODES.UNAUTHORIZED);
   }
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded; // Gắn thông tin user từ token vào request
+    req.user = decoded;
     next();
   } catch (error) {
-    res.status(401).json({ message: 'Token is not valid' });
+    throwError(ERROR_MESSAGES.INVALID_TOKEN, STATUS_CODES.UNAUTHORIZED);
   }
 };
 
-const createCard = async (req, res) => {
-  const { title, description, columnId, position } = req.body;
-  const token = req.header('Authorization')?.replace('Bearer ', '');
-
-  try {
-    const column = await getColumnById(columnId, req.user.id, token);
-    if (!column) {
-      return res.status(404).json({ message: 'Column not found' });
-    }
-
-    const board = await getBoardById(column.boardId, req.user.id, token);
-    if (!board) {
-      return res.status(403).json({ message: 'Unauthorized or board not found' });
-    }
-
-    const card = new Card({ title, description, columnId, position });
-    await card.save();
-
-    // Thêm card._id vào cardOrderIds của column
-    await updateColumnCardOrder(columnId, card._id, token);
-
-    res.status(201).json(card);
-  } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+const validateColumnAndBoard = async (columnId, userId, token) => {
+  const column = await getColumnById(columnId, userId, token);
+  if (!column) {
+    throwError(ERROR_MESSAGES.COLUMN_NOT_FOUND, STATUS_CODES.NOT_FOUND);
   }
+
+  const board = await getBoardById(column.boardId, userId, token);
+  if (!board) {
+    throwError(ERROR_MESSAGES.UNAUTHORIZED_OR_BOARD_NOT_FOUND, STATUS_CODES.FORBIDDEN);
+  }
+
+  return { column, board };
+};
+
+const createCard = async (req, res) => {
+  const { title, description, columnId } = req.body;
+  const token = extractToken(req);
+
+  const { column } = await validateColumnAndBoard(columnId, req.user.id, token);
+
+  const card = new Card({ title, description, columnId });
+  await card.save();
+
+  await updateColumnCardOrder(columnId, card._id, token);
+
+  res.status(STATUS_CODES.CREATED).json(card);
 };
 
 const getCardsByColumn = async (req, res) => {
   const { columnId } = req.params;
-  const token = req.header('Authorization')?.replace('Bearer ', '');
+  const token = extractToken(req);
 
-  try {
-    const column = await getColumnById(columnId, req.user.id, token);
-    if (!column) {
-      return res.status(404).json({ message: 'Column not found' });
-    }
+  await validateColumnAndBoard(columnId, req.user.id, token);
 
-    const board = await getBoardById(column.boardId, req.user.id, token);
-    if (!board) {
-      return res.status(403).json({ message: 'Unauthorized or board not found' });
-    }
-
-    const cards = await Card.find({ columnId }).sort({ position: 1 });
-    res.json(cards);
-  } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
+  const cards = await Card.find({ columnId });
+  res.json(cards);
 };
 
 const updateCard = async (req, res) => {
   const { id } = req.params;
-  const { title, description, position } = req.body;
-  const token = req.header('Authorization')?.replace('Bearer ', '');
+  const { title, description } = req.body;
+  const token = extractToken(req);
 
-  try {
-    const card = await Card.findById(id);
-    if (!card) {
-      return res.status(404).json({ message: 'Card not found' });
-    }
-
-    const column = await getColumnById(card.columnId, req.user.id, token);
-    if (!column) {
-      return res.status(404).json({ message: 'Column not found' });
-    }
-
-    const board = await getBoardById(column.boardId, req.user.id, token);
-    if (!board) {
-      return res.status(403).json({ message: 'Unauthorized or board not found' });
-    }
-
-    card.title = title || card.title;
-    card.description = description || card.description;
-    card.position = position !== undefined ? position : card.position;
-    card.updatedAt = Date.now();
-    await card.save();
-
-    res.json(card);
-  } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+  const card = await Card.findById(id);
+  if (!card) {
+    throwError(ERROR_MESSAGES.CARD_NOT_FOUND, STATUS_CODES.NOT_FOUND);
   }
+
+  await validateColumnAndBoard(card.columnId, req.user.id, token);
+
+  card.title = title || card.title;
+  card.description = description || card.description;
+  card.updatedAt = Date.now();
+  await card.save();
+
+  res.json(card);
 };
 
 const deleteCard = async (req, res) => {
   const { id } = req.params;
-  const token = req.header('Authorization')?.replace('Bearer ', '');
+  const token = extractToken(req);
 
-  try {
-    const card = await Card.findById(id);
-    if (!card) {
-      return res.status(404).json({ message: 'Card not found' });
-    }
-
-    const column = await getColumnById(card.columnId, req.user.id, token);
-    if (!column) {
-      return res.status(404).json({ message: 'Column not found' });
-    }
-
-    const board = await getBoardById(column.boardId, req.user.id, token);
-    if (!board) {
-      return res.status(403).json({ message: 'Unauthorized or board not found' });
-    }
-
-    await card.deleteOne();
-    res.json({ message: 'Card deleted successfully' });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+  const card = await Card.findById(id);
+  if (!card) {
+    throwError(ERROR_MESSAGES.CARD_NOT_FOUND, STATUS_CODES.NOT_FOUND);
   }
+
+  await validateColumnAndBoard(card.columnId, req.user.id, token);
+
+  await card.deleteOne();
+  res.json({ message: ERROR_MESSAGES.CARD_DELETED });
 };
 
 module.exports = { createCard, getCardsByColumn, updateCard, deleteCard, authMiddleware };
