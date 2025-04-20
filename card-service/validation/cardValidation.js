@@ -14,11 +14,6 @@ const createCardSchema = Joi.object({
     'string.hex': 'Column ID must be a hex string',
     'any.required': 'Column ID is required',
   }),
-  position: Joi.number().integer().min(0).required().messages({
-    'number.base': 'Position must be a number',
-    'number.min': 'Position must be greater than or equal to 0',
-    'any.required': 'Position is required',
-  }),
 });
 
 const updateCardSchema = Joi.object({
@@ -28,10 +23,6 @@ const updateCardSchema = Joi.object({
   }),
   description: Joi.string().max(500).optional().messages({
     'string.max': 'Description must not exceed 500 characters',
-  }),
-  position: Joi.number().integer().min(0).optional().messages({
-    'number.base': 'Position must be a number',
-    'number.min': 'Position must be greater than or equal to 0',
   }),
 });
 
