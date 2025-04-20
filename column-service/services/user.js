@@ -1,5 +1,7 @@
 const axios = require('axios');
 require('dotenv').config();
+const { throwError } = require('../utils/helpers');
+const { STATUS_CODES, ERROR_MESSAGES } = require('../utils/constants');
 
 const USER_SERVICE_URL = process.env.USER_SERVICE_URL || 'http://localhost:3001';
 
@@ -10,8 +12,7 @@ const checkUserExists = async (userId, token) => {
     });
     return response.data;
   } catch (error) {
-    if (error.response?.status === 404) return null;
-    throw new Error('Error communicating with User Service');
+    return null; // Trả về null cho tất cả lỗi
   }
 };
 
