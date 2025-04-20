@@ -1,5 +1,7 @@
 const axios = require('axios');
 require('dotenv').config();
+const { throwError } = require('../utils/helpers');
+const { STATUS_CODES, ERROR_MESSAGES } = require('../utils/constants');
 
 const BOARD_SERVICE_URL = process.env.BOARD_SERVICE_URL || 'http://localhost:3002';
 
@@ -10,21 +12,20 @@ const checkBoardAccess = async (boardId, userId, token) => {
     });
     return response.data;
   } catch (error) {
-    if (error.response?.status === 404 || error.response?.status === 403) return null;
-    throw new Error('Error communicating with Board Service');
+    return null; // Trả về null cho tất cả lỗi để xử lý "Not found column" ở card service
   }
 };
 
-const updateBoardColumnOrder = async (boardId, _id, token) => {
+const updateBoardColumnOrder = async (boardId, columnId, token) => {
   try {
     const response = await axios.put(
       `${BOARD_SERVICE_URL}/api/boards/${boardId}`,
-      { columnOrderIds: { $push: _id } },
+      { columnOrderIds: { $push: columnId } },
       { headers: { Authorization: `Bearer ${token}` } }
     );
     return response.data;
   } catch (error) {
-    throw new Error('Error communicating with list columnOrderIds: ' + error.message);
+    throwError(`${ERROR_MESSAGES.BOARD_UPDATE_ERROR}: ${error.message}`, STATUS_CODES.INTERNAL_SERVER_ERROR);
   }
 };
 

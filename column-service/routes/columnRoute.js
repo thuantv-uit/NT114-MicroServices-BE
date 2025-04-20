@@ -9,12 +9,17 @@ const {
   authMiddleware,
 } = require('../controllers/columnController');
 const validate = require('../middleware/validate');
+const errorHandler = require('../middleware/errorHandler');
 const { createColumnSchema, updateColumnSchema } = require('../validation/columnValidation');
 
-router.post('/', authMiddleware, validate(createColumnSchema), createColumn);
-router.get('/board/:boardId', authMiddleware, getColumnsByBoard);
-router.get('/:id', authMiddleware, getColumnById);
-router.put('/:id', authMiddleware, validate(updateColumnSchema), updateColumn);
-router.delete('/:id', authMiddleware, deleteColumn);
+router.use(authMiddleware);
+
+router.post('/', validate(createColumnSchema), createColumn);
+router.get('/board/:boardId', getColumnsByBoard);
+router.get('/:id', getColumnById);
+router.put('/:id', validate(updateColumnSchema), updateColumn);
+router.delete('/:id', deleteColumn);
+
+router.use(errorHandler);
 
 module.exports = router;
