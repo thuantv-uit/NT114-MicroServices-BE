@@ -42,11 +42,11 @@ const validateUserAndBoardAccess = async (boardId, userId, token, checkOwnership
   return board;
 };
 
-const createBoard = async (req, res) => {
-  const { title, description, memberIds = [], columnOrderIds = [] } = req.body;
-  const token = extractToken(req);
-
+const createBoard = async (req, res, next) => {
   try {
+    const { title, description, memberIds = [], columnOrderIds = [] } = req.body;
+    const token = extractToken(req);
+
     const user = await checkUserExists(req.user.id, token);
     if (!user) {
       throwError(ERROR_MESSAGES.USER_NOT_FOUND, STATUS_CODES.NOT_FOUND);
@@ -67,14 +67,14 @@ const createBoard = async (req, res) => {
 
     res.status(STATUS_CODES.CREATED).json(board);
   } catch (error) {
-    throwError(error.message || ERROR_MESSAGES.SERVER_ERROR, STATUS_CODES.INTERNAL_SERVER_ERROR);
+    next(error);
   }
 };
 
-const getBoards = async (req, res) => {
-  const token = extractToken(req);
-
+const getBoards = async (req, res, next) => {
   try {
+    const token = extractToken(req);
+
     const user = await checkUserExists(req.user.id, token);
     if (!user) {
       throwError(ERROR_MESSAGES.USER_NOT_FOUND, STATUS_CODES.NOT_FOUND);
@@ -85,26 +85,30 @@ const getBoards = async (req, res) => {
     });
     res.json(boards);
   } catch (error) {
-    throwError(error.message || ERROR_MESSAGES.SERVER_ERROR, STATUS_CODES.INTERNAL_SERVER_ERROR);
+    next(error);
   }
 };
 
-const getBoardById = async (req, res) => {
-  const { id } = req.params;
-  const token = extractToken(req);
+const getBoardById = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const token = extractToken(req);
 
-  const board = await validateUserAndBoardAccess(id, req.user.id, token);
-  res.json(board);
+    const board = await validateUserAndBoardAccess(id, req.user.id, token);
+    res.json(board);
+  } catch (error) {
+    next(error);
+  }
 };
 
-const updateBoard = async (req, res) => {
-  const { id } = req.params;
-  const { title, description, memberIds, columnOrderIds } = req.body;
-  const token = extractToken(req);
-
-  const board = await validateUserAndBoardAccess(id, req.user.id, token, true);
-
+const updateBoard = async (req, res, next) => {
   try {
+    const { id } = req.params;
+    const { title, description, memberIds, columnOrderIds } = req.body;
+    const token = extractToken(req);
+
+    const board = await validateUserAndBoardAccess(id, req.user.id, token, true);
+
     if (title) board.title = title;
     if (description) board.description = description;
     if (memberIds) {
@@ -130,27 +134,31 @@ const updateBoard = async (req, res) => {
     await board.save();
     res.json(board);
   } catch (error) {
-    throwError(error.message || ERROR_MESSAGES.SERVER_ERROR, STATUS_CODES.INTERNAL_SERVER_ERROR);
+    next(error);
   }
 };
 
-const deleteBoard = async (req, res) => {
-  const { id } = req.params;
-  const token = extractToken(req);
+const deleteBoard = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const token = extractToken(req);
 
-  const board = await validateUserAndBoardAccess(id, req.user.id, token, true);
+    const board = await validateUserAndBoardAccess(id, req.user.id, token, true);
 
-  await board.deleteOne();
-  res.json({ message: ERROR_MESSAGES.BOARD_DELETED });
+    await board.deleteOne();
+    res.json({ message: ERROR_MESSAGES.BOARD_DELETED });
+  } catch (error) {
+    next(error);
+  }
 };
 
-const inviteUserToBoard = async (req, res) => {
-  const { boardId, email } = req.body;
-  const token = extractToken(req);
-
-  const board = await validateUserAndBoardAccess(boardId, req.user.id, token, true);
-
+const inviteUserToBoard = async (req, res, next) => {
   try {
+    const { boardId, email } = req.body;
+    const token = extractToken(req);
+
+    const board = await validateUserAndBoardAccess(boardId, req.user.id, token, true);
+
     const userResponse = await checkUserExistsByEmail(email, token);
     if (!userResponse) {
       throwError(ERROR_MESSAGES.USER_NOT_FOUND_BY_EMAIL, STATUS_CODES.NOT_FOUND);
@@ -166,7 +174,7 @@ const inviteUserToBoard = async (req, res) => {
 
     res.status(STATUS_CODES.OK).json({ message: ERROR_MESSAGES.USER_INVITED, board });
   } catch (error) {
-    throwError(error.message || ERROR_MESSAGES.SERVER_ERROR, STATUS_CODES.INTERNAL_SERVER_ERROR);
+    next(error);
   }
 };
 
