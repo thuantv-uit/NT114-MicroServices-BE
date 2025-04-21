@@ -1,111 +1,111 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/userModel');
+const { throwError, extractToken } = require('../utils/helpers');
+const { STATUS_CODES, ERROR_MESSAGES } = require('../utils/constants');
 
-const registerUser = async (req, res) => {
-  const { username, email, password } = req.body;
-
+const registerUser = async (req, res, next) => {
   try {
+    const { username, email, password } = req.body;
+
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res.status(400).json({ message: 'User already exists' });
+      throwError(ERROR_MESSAGES.USER_ALREADY_EXISTS, STATUS_CODES.BAD_REQUEST);
     }
 
     const user = new User({ username, email, password });
     await user.save();
 
-    res.status(201).json({
+    res.status(STATUS_CODES.CREATED).json({
       user: { id: user._id, username, email },
     });
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    next(error);
   }
 };
 
-const loginUser = async (req, res) => {
-  const { email, password } = req.body;
-
+const loginUser = async (req, res, next) => {
   try {
+    const { email, password } = req.body;
+
     const user = await User.findOne({ email });
     if (!user || !(await user.comparePassword(password))) {
-      return res.status(400).json({ message: 'Invalid credentials' });
+      throwError(ERROR_MESSAGES.INVALID_CREDENTIALS, STATUS_CODES.BAD_REQUEST);
     }
 
-    // Tạo JWT token
     const token = jwt.sign(
       { id: user._id, email: user.email },
       process.env.JWT_SECRET,
-      { expiresIn: '1h' } // Token hết hạn sau 1 giờ
+      { expiresIn: '1h' }
     );
 
     res.json({
       user: { id: user._id, username: user.username, email },
-      token, // Trả về token
+      token,
     });
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    next(error);
   }
 };
 
-// Middleware để xác thực token
 const authMiddleware = (req, res, next) => {
-  const token = req.header('Authorization')?.replace('Bearer ', '');
+  const token = extractToken(req);
   if (!token) {
-    return res.status(401).json({ message: 'No token, authorization denied' });
+    throwError(ERROR_MESSAGES.NO_TOKEN, STATUS_CODES.UNAUTHORIZED);
   }
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded; // Gắn thông tin user từ token vào request
+    req.user = decoded;
     next();
   } catch (error) {
-    res.status(401).json({ message: 'Token is not valid' });
+    throwError(ERROR_MESSAGES.INVALID_TOKEN, STATUS_CODES.UNAUTHORIZED);
   }
 };
 
-const getCurrentUser = async (req, res) => {
+const getCurrentUser = async (req, res, next) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      throwError(ERROR_MESSAGES.USER_NOT_FOUND, STATUS_CODES.NOT_FOUND);
     }
     res.json(user);
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    next(error);
   }
 };
 
-const getUserById = async (req, res) => {
+const getUserById = async (req, res, next) => {
   try {
     const user = await User.findById(req.params.id).select('-password');
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      throwError(ERROR_MESSAGES.USER_NOT_FOUND, STATUS_CODES.NOT_FOUND);
     }
     res.json(user);
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    next(error);
   }
 };
 
-const getAllUsers = async (req, res) => {
+const getAllUsers = async (req, res, next) => {
   try {
     const users = await User.find().select('-password');
     res.json(users);
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    next(error);
   }
 };
 
-const getUserByEmail = async (req, res) => {
-  const { email } = req.body;
-
+const getUserByEmail = async (req, res, next) => {
   try {
+    const { email } = req.body;
+
     const user = await User.findOne({ email }).select('-password');
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      throwError(ERROR_MESSAGES.USER_NOT_FOUND, STATUS_CODES.NOT_FOUND);
     }
     res.json(user);
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    next(error);
   }
 };
 
