@@ -1,7 +1,7 @@
 {
-    "name": "trello-board-service",
+    "name": "thunio-board-service",
     "version": "1.0.0",
-    "description": "Board Service for Trello-like app",
+    "description": "Board Service for thunio-like app",
     "main": "app.js",
     "scripts": {
       "start": "node app.js",

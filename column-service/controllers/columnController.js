@@ -35,17 +35,17 @@ const validateUserAndBoard = async (boardId, userId, token) => {
   return { user, board };
 };
 
-const createColumn = async (req, res) => {
-  const { title, boardId, cardOrderIds = [] } = req.body;
-  const token = extractToken(req);
-
-  if (!isValidObjectId(boardId)) {
-    throwError(ERROR_MESSAGES.INVALID_BOARD_ID, STATUS_CODES.BAD_REQUEST);
-  }
-
-  await validateUserAndBoard(boardId, req.user.id, token);
-
+const createColumn = async (req, res, next) => {
   try {
+    const { title, boardId, cardOrderIds = [] } = req.body;
+    const token = extractToken(req);
+
+    if (!isValidObjectId(boardId)) {
+      throwError(ERROR_MESSAGES.INVALID_BOARD_ID, STATUS_CODES.BAD_REQUEST);
+    }
+
+    await validateUserAndBoard(boardId, req.user.id, token);
+
     const column = new Column({ title, boardId, cardOrderIds });
     await column.save();
 
@@ -53,59 +53,67 @@ const createColumn = async (req, res) => {
 
     res.status(STATUS_CODES.CREATED).json(column);
   } catch (error) {
-    throwError(error.message || ERROR_MESSAGES.SERVER_ERROR, STATUS_CODES.INTERNAL_SERVER_ERROR);
+    next(error);
   }
 };
 
-const getColumnsByBoard = async (req, res) => {
-  const { boardId } = req.params;
-  const token = extractToken(req);
-
-  if (!isValidObjectId(boardId)) {
-    throwError(ERROR_MESSAGES.INVALID_BOARD_ID, STATUS_CODES.BAD_REQUEST);
-  }
-
-  await validateUserAndBoard(boardId, req.user.id, token);
-
-  const columns = await Column.find({ boardId });
-  res.json(columns);
-};
-
-const getColumnById = async (req, res) => {
-  const { id } = req.params;
-  const token = extractToken(req);
-
-  if (!isValidObjectId(id)) {
-    throwError(ERROR_MESSAGES.INVALID_COLUMN_ID, STATUS_CODES.BAD_REQUEST);
-  }
-
-  const column = await Column.findById(id);
-  if (!column) {
-    throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
-  }
-
-  await validateUserAndBoard(column.boardId, req.user.id, token);
-
-  res.json(column);
-};
-
-const updateColumn = async (req, res) => {
-  const { id } = req.params;
-  const { title, cardOrderIds } = req.body;
-  const token = extractToken(req);
-
-  if (!isValidObjectId(id)) {
-    throwError(ERROR_MESSAGES.INVALID_COLUMN_ID, STATUS_CODES.BAD_REQUEST);
-  }
-
-  const column = await Column.findById(id);
-  if (!column) {
-    throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
-  }
-
-  await validateUserAndBoard(column.boardId, req.user.id, token);
-
+const getColumnsByBoard = async (req, res, next) => {
   try {
+    const { boardId } = req.params;
+    const token = extractToken(req);
+
+    if (!isValidObjectId(boardId)) {
+      throwError(ERROR_MESSAGES.INVALID_BOARD_ID, STATUS_CODES.BAD_REQUEST);
+    }
+
+    await validateUserAndBoard(boardId, req.user.id, token);
+
+    const columns = await Column.find({ boardId });
+    res.json(columns);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getColumnById = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const token = extractToken(req);
+
+    if (!isValidObjectId(id)) {
+      throwError(ERROR_MESSAGES.INVALID_COLUMN_ID, STATUS_CODES.BAD_REQUEST);
+    }
+
+    const column = await Column.findById(id);
+    if (!column) {
+      throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
+    }
+
+    await validateUserAndBoard(column.boardId, req.user.id, token);
+
+    res.json(column);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const updateColumn = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { title, cardOrderIds } = req.body;
+    const token = extractToken(req);
+
+    if (!isValidObjectId(id)) {
+      throwError(ERROR_MESSAGES.INVALID_COLUMN_ID, STATUS_CODES.BAD_REQUEST);
+    }
+
+    const column = await Column.findById(id);
+    if (!column) {
+      throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
+    }
+
+    await validateUserAndBoard(column.boardId, req.user.id, token);
+
     if (title) column.title = title;
     
     if (cardOrderIds) {
@@ -125,27 +133,31 @@ const updateColumn = async (req, res) => {
     await column.save();
     res.json(column);
   } catch (error) {
-    throwError(error.message || ERROR_MESSAGES.SERVER_ERROR, STATUS_CODES.INTERNAL_SERVER_ERROR);
+    next(error);
   }
 };
 
-const deleteColumn = async (req, res) => {
-  const { id } = req.params;
-  const token = extractToken(req);
+const deleteColumn = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const token = extractToken(req);
 
-  if (!isValidObjectId(id)) {
-    throwError(ERROR_MESSAGES.INVALID_COLUMN_ID, STATUS_CODES.BAD_REQUEST);
+    if (!isValidObjectId(id)) {
+      throwError(ERROR_MESSAGES.INVALID_COLUMN_ID, STATUS_CODES.BAD_REQUEST);
+    }
+
+    const column = await Column.findById(id);
+    if (!column) {
+      throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
+    }
+
+    await validateUserAndBoard(column.boardId, req.user.id, token);
+
+    await column.deleteOne();
+    res.json({ message: ERROR_MESSAGES.COLUMN_DELETED });
+  } catch (error) {
+    next(error);
   }
-
-  const column = await Column.findById(id);
-  if (!column) {
-    throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
-  }
-
-  await validateUserAndBoard(column.boardId, req.user.id, token);
-
-  await column.deleteOne();
-  res.json({ message: ERROR_MESSAGES.COLUMN_DELETED });
 };
 
 module.exports = { createColumn, getColumnsByBoard, getColumnById, updateColumn, deleteColumn, authMiddleware };

@@ -1,7 +1,7 @@
 {
-    "name": "trello-list-service",
+    "name": "thunio-list-service",
     "version": "1.0.0",
-    "description": "List Service for Trello-like app",
+    "description": "List Service for thunio-like app",
     "main": "app.js",
     "scripts": {
         "start": "node app.js",

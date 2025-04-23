@@ -1,7 +1,7 @@
 {
-    "name": "trello-card-service",
+    "name": "thunio-card-service",
     "version": "1.0.0",
-    "description": "Card Service for Trello-like app",
+    "description": "Card Service for thunio-like app",
     "main": "app.js",
     "scripts": {
         "start": "node app.js",
