@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # Microservice: card
   card:
-    image: card:latest
+    image: nt114-be-card:latest
     ports:
       - "3004:3004"
     environment:
@@ -15,7 +15,7 @@ services:
 
   # Microservice: column
   column:
-    image: column:latest
+    image: nt114-be-column:latest
     ports:
       - "3003:3003"
     environment:
@@ -27,7 +27,7 @@ services:
 
   # Microservice: board
   board:
-    image: board:latest
+    image: nt114-be-board:latest
     ports:
       - "3002:3002"
     environment:
@@ -39,7 +39,7 @@ services:
 
   # Microservice: user
   user:
-    image: user:latest
+    image: nt114-be-user:latest
     ports:
       - "3001:3001"
     environment:
