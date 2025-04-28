@@ -44,7 +44,7 @@ const validateUserAndBoardAccess = async (boardId, userId, token, checkOwnership
 
 const createBoard = async (req, res, next) => {
   try {
-    const { title, description, memberIds = [], columnOrderIds = [] } = req.body;
+    const { title, description, backgroundColor, memberIds = [], columnOrderIds = [] } = req.body;
     const token = extractToken(req);
 
     const user = await checkUserExists(req.user.id, token);
@@ -59,6 +59,7 @@ const createBoard = async (req, res, next) => {
     const board = new Board({
       title,
       description,
+      backgroundColor: backgroundColor || '#FFFFFF',
       userId: req.user.id,
       memberIds,
       columnOrderIds,
@@ -104,13 +105,14 @@ const getBoardById = async (req, res, next) => {
 const updateBoard = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { title, description, memberIds, columnOrderIds } = req.body;
+    const { title, description, backgroundColor, memberIds, columnOrderIds } = req.body;
     const token = extractToken(req);
 
     const board = await validateUserAndBoardAccess(id, req.user.id, token, true);
 
     if (title) board.title = title;
     if (description) board.description = description;
+    if (backgroundColor) board.backgroundColor = backgroundColor;
     if (memberIds) {
       if (memberIds.some(id => !isValidObjectId(id))) {
         throwError(ERROR_MESSAGES.INVALID_ID, STATUS_CODES.BAD_REQUEST);
