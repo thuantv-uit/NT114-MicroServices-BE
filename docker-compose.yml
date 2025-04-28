@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # Microservice: card
   card:
-    image: card:v1
+    image: thuan410/nt114-be-card:v1
     ports:
       - "3004:3004"
     environment:
@@ -14,7 +14,7 @@ services:
 
   # Microservice: column
   column:
-    image: column:v1
+    image: thuan410/nt114-be-column:v1
     ports:
       - "3003:3003"
     environment:
@@ -25,7 +25,7 @@ services:
 
   # Microservice: board
   board:
-    image: board:v1
+    image: thuan410/nt114-be-board:v1
     ports:
       - "3002:3002"
     environment:
@@ -36,7 +36,7 @@ services:
 
   # Microservice: user
   user:
-    image: user:v1
+    image: thuan410/nt114-be-user:v1
     ports:
       - "3001:3001"
     environment:
@@ -48,5 +48,4 @@ services:
 # Định nghĩa network để các container giao tiếp với nhau
 networks:
   app-network:
-    external:
-      name: thuantv
+    driver: bridge
