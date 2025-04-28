@@ -1,0 +1,34 @@
+const express = require('express');
+const router = express.Router();
+const {
+  authMiddleware,
+  inviteToBoard,
+  inviteToColumn,
+  assignToCard,
+  acceptInvitation,
+  rejectInvitation,
+  getBoardInvitations,
+  getColumnInvitations,
+  getCardInvitations,
+} = require('../controllers/invitationController');
+const validate = require('../middleware/validate');
+const errorHandler = require('../middleware/errorHandler');
+const { inviteToBoardSchema, inviteToColumnSchema, assignToCardSchema } = require('../utils/invitationValidation');
+
+router.use(authMiddleware);
+
+router.post('/board', validate(inviteToBoardSchema), inviteToBoard);
+router.post('/column', validate(inviteToColumnSchema), inviteToColumn);
+router.post('/card', validate(assignToCardSchema), assignToCard);
+router.put('/accept/:invitationId', acceptInvitation);
+router.put('/reject/:invitationId', rejectInvitation);
+router.get('/board/:boardId/user/:userId', getBoardInvitations);
+router.get('/board/user/:userId', getBoardInvitations);
+router.get('/column/:columnId/user/:userId', getColumnInvitations);
+router.get('/column/board/:boardId/user/:userId', getColumnInvitations);
+router.get('/card/:cardId/user/:userId', getCardInvitations);
+router.get('/card/user/:userId', getCardInvitations);
+
+router.use(errorHandler);
+
+module.exports = router;
