@@ -1,12 +1,13 @@
-const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
+const jwt = require('jsonwebtoken');
 const Column = require('../models/columnModel');
-const { checkUserExists } = require('../services/user');
-const { checkBoardAccess, updateBoardColumnOrder } = require('../services/board');
-const { checkColumnInvitation } = require('../services/invitation');
 const { extractToken, throwError, isValidObjectId } = require('../utils/helpers');
+const { updateBoardColumnOrder } = require('../services/board');
+const { checkColumnInvitation } = require('../services/invitation');
+const { validateUserAndBoardAccess } = require('../utils/permissions');
 const { STATUS_CODES, ERROR_MESSAGES } = require('../utils/constants');
 
+// Middleware xác thực token
 const authMiddleware = (req, res, next) => {
   const token = extractToken(req);
   if (!token) {
@@ -21,33 +22,81 @@ const authMiddleware = (req, res, next) => {
   }
 };
 
-const validateUserAndBoard = async (boardId, userId, token) => {
-  const user = await checkUserExists(userId, token);
-  if (!user) {
-    throwError(ERROR_MESSAGES.USER_NOT_FOUND, STATUS_CODES.NOT_FOUND);
-  }
-  const board = await checkBoardAccess(boardId, userId, token);
-  if (!board) {
-    throwError(ERROR_MESSAGES.UNAUTHORIZED_OR_BOARD_NOT_FOUND, STATUS_CODES.FORBIDDEN);
-  }
-  return { user, board };
-};
-
 const createColumn = async (req, res, next) => {
   try {
-    const { title, boardId, cardOrderIds = [] } = req.body;
+    const { title, boardId } = req.body;
     const token = extractToken(req);
     if (!isValidObjectId(boardId)) {
-      throwError(ERROR_MESSAGES.INVALID_BOARD_ID, STATUS_CODES.BAD_REQUEST);
+      throwError(ERROR_MESSAGES.INVALID_ID, STATUS_CODES.BAD_REQUEST);
     }
-    const { board } = await validateUserAndBoard(boardId, req.user.id, token);
+    const { board } = await validateUserAndBoardAccess(boardId, req.user.id, token);
+    // Chỉ board owner được tạo column
     if (board.userId.toString() !== req.user.id) {
       throwError(ERROR_MESSAGES.NOT_BOARD_OWNER, STATUS_CODES.FORBIDDEN);
     }
-    const column = new Column({ title, boardId, cardOrderIds });
+
+    const column = new Column({ title, boardId });
     await column.save();
-    await updateBoardColumnOrder(boardId, column._id, token);
+
+    const newColumnOrderIds = [...(board.columnOrderIds || []), column._id.toString()];
+    await updateBoardColumnOrder(boardId, newColumnOrderIds, token);
+
     res.status(STATUS_CODES.CREATED).json(column);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const updateColumn = async (req, res, next) => {
+  try {
+    const { columnId } = req.params;
+    const { title, cardOrderIds } = req.body;
+    const token = extractToken(req);
+    if (!isValidObjectId(columnId)) {
+      throwError(ERROR_MESSAGES.INVALID_COLUMN_ID, STATUS_CODES.BAD_REQUEST);
+    }
+    const column = await Column.findById(columnId);
+    if (!column) {
+      throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
+    }
+    const { board } = await validateUserAndBoardAccess(column.boardId, req.user.id, token);
+    // Chỉ board owner được sửa column
+    if (board.userId.toString() !== req.user.id) {
+      throwError(ERROR_MESSAGES.NOT_BOARD_OWNER, STATUS_CODES.FORBIDDEN);
+    }
+    column.title = title !== undefined ? title : column.title;
+    column.cardOrderIds = cardOrderIds !== undefined ? cardOrderIds : column.cardOrderIds;
+    column.updatedAt = Date.now();
+    await column.save();
+    res.json(column);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const deleteColumn = async (req, res, next) => {
+  try {
+    const { columnId } = req.params;
+    const token = extractToken(req);
+    if (!isValidObjectId(columnId)) {
+      throwError(ERROR_MESSAGES.INVALID_COLUMN_ID, STATUS_CODES.BAD_REQUEST);
+    }
+    const column = await Column.findById(columnId);
+    if (!column) {
+      throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
+    }
+    const { board } = await validateUserAndBoardAccess(column.boardId, req.user.id, token);
+    // Chỉ board owner được xóa column
+    if (board.userId.toString() !== req.user.id) {
+      throwError(ERROR_MESSAGES.NOT_BOARD_OWNER, STATUS_CODES.FORBIDDEN);
+    }
+
+    await column.deleteOne();
+
+    const newColumnOrderIds = board.columnOrderIds.filter(id => id.toString() !== columnId);
+    await updateBoardColumnOrder(column.boardId, newColumnOrderIds, token);
+
+    res.json({ message: ERROR_MESSAGES.COLUMN_DELETED });
   } catch (error) {
     next(error);
   }
@@ -58,122 +107,59 @@ const getColumnsByBoard = async (req, res, next) => {
     const { boardId } = req.params;
     const token = extractToken(req);
     if (!isValidObjectId(boardId)) {
-      throwError(ERROR_MESSAGES.INVALID_BOARD_ID, STATUS_CODES.BAD_REQUEST);
+      throwError(ERROR_MESSAGES.INVALID_ID, STATUS_CODES.BAD_REQUEST);
     }
-    await validateUserAndBoard(boardId, req.user.id, token);
-    const invitations = await checkColumnInvitation(boardId, null, req.user.id, token);
-    const columnIds = invitations ? invitations.map(inv => inv.columnId) : [];
-    const columns = await Column.find({ boardId, _id: { $in: columnIds } });
-    res.json(columns);
+    const { board } = await validateUserAndBoardAccess(boardId, req.user.id, token);
+
+    const allColumns = await Column.find({ boardId });
+
+    const validColumns = allColumns.filter(col => board.columnOrderIds.includes(col._id.toString()));
+
+    if (board.userId.toString() === req.user.id) {
+      return res.json(validColumns);
+    }
+
+    const columnInvitations = await checkColumnInvitation(boardId, null, req.user.id, token);
+    const allowedColumnIds = columnInvitations ? columnInvitations.map(inv => inv.columnId.toString()) : [];
+    const allowedColumns = validColumns.filter(col => allowedColumnIds.includes(col._id.toString()));
+    res.json(allowedColumns);
   } catch (error) {
     next(error);
   }
 };
 
-// const getColumnById = async (req, res, next) => {
-//   try {
-//     const { id } = req.params;
-//     const token = extractToken(req);
-//     if (!isValidObjectId(id)) {
-//       throwError(ERROR_MESSAGES.INVALID_COLUMN_ID, STATUS_CODES.BAD_REQUEST);
-//     }
-//     const column = await Column.findById(id);
-//     if (!column) {
-//       throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
-//     }
-//     await validateUserAndBoard(column.boardId, req.user.id, token);
-//     const invitation = await checkColumnInvitation(column.boardId, id, req.user.id, token);
-//     if (!invitation) {
-//       throwError(ERROR_MESSAGES.NOT_INVITED_TO_COLUMN, STATUS_CODES.FORBIDDEN);
-//     }
-//     res.json(column);
-//   } catch (error) {
-//     next(error);
-//   }
-// };
 const getColumnById = async (req, res, next) => {
   try {
-    const { id } = req.params;
+    const { columnId } = req.params;
     const token = extractToken(req);
-    if (!isValidObjectId(id)) {
+    if (!isValidObjectId(columnId)) {
       throwError(ERROR_MESSAGES.INVALID_COLUMN_ID, STATUS_CODES.BAD_REQUEST);
     }
-    const column = await Column.findById(id);
+    const column = await Column.findById(columnId);
     if (!column) {
       throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
     }
-    const { board } = await validateUserAndBoard(column.boardId, req.user.id, token);
-    // Cho phép board owner truy cập mà không cần lời mời column
+    const { board } = await validateUserAndBoardAccess(column.boardId, req.user.id, token);
+
     if (board.userId.toString() !== req.user.id) {
-      const invitation = await checkColumnInvitation(column.boardId, id, req.user.id, token);
-      if (!invitation) {
+      const columnInvitations = await checkColumnInvitation(column.boardId, columnId, req.user.id, token);
+      const hasInvitation = columnInvitations.some(inv => inv.columnId.toString() === columnId);
+      if (!hasInvitation) {
         throwError(ERROR_MESSAGES.NOT_INVITED_TO_COLUMN, STATUS_CODES.FORBIDDEN);
       }
     }
+
     res.json(column);
   } catch (error) {
     next(error);
   }
 };
 
-
-const updateColumn = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { title, cardOrderIds } = req.body;
-    const token = extractToken(req);
-    if (!isValidObjectId(id)) {
-      throwError(ERROR_MESSAGES.INVALID_COLUMN_ID, STATUS_CODES.BAD_REQUEST);
-    }
-    const column = await Column.findById(id);
-    if (!column) {
-      throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
-    }
-    const { board } = await validateUserAndBoard(column.boardId, req.user.id, token);
-    if (board.userId.toString() !== req.user.id) {
-      throwError(ERROR_MESSAGES.NOT_BOARD_OWNER, STATUS_CODES.FORBIDDEN);
-    }
-    if (title) column.title = title;
-    if (cardOrderIds) {
-      if (cardOrderIds.$push) {
-        if (!isValidObjectId(cardOrderIds.$push)) {
-          throwError(ERROR_MESSAGES.INVALID_CARD_ID, STATUS_CODES.BAD_REQUEST);
-        }
-        column.cardOrderIds.push(cardOrderIds.$push);
-      } else if (Array.isArray(cardOrderIds)) {
-        if (cardOrderIds.some(id => !isValidObjectId(id))) {
-          throwError(ERROR_MESSAGES.INVALID_CARD_ID, STATUS_CODES.BAD_REQUEST);
-        }
-        column.cardOrderIds = cardOrderIds;
-      }
-    }
-    await column.save();
-    res.json(column);
-  } catch (error) {
-    next(error);
-  }
+module.exports = {
+  authMiddleware,
+  createColumn,
+  updateColumn,
+  deleteColumn,
+  getColumnsByBoard,
+  getColumnById,
 };
-
-const deleteColumn = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const token = extractToken(req);
-    if (!isValidObjectId(id)) {
-      throwError(ERROR_MESSAGES.INVALID_COLUMN_ID, STATUS_CODES.BAD_REQUEST);
-    }
-    const column = await Column.findById(id);
-    if (!column) {
-      throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
-    }
-    const { board } = await validateUserAndBoard(column.boardId, req.user.id, token);
-    if (board.userId.toString() !== req.user.id) {
-      throwError(ERROR_MESSAGES.NOT_BOARD_OWNER, STATUS_CODES.FORBIDDEN);
-    }
-    await column.deleteOne();
-    res.json({ message: ERROR_MESSAGES.COLUMN_DELETED });
-  } catch (error) {
-    next(error);
-  }
-};
-
-module.exports = { createColumn, getColumnsByBoard, getColumnById, updateColumn, deleteColumn, authMiddleware };
