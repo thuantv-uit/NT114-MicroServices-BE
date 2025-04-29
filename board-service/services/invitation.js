@@ -7,15 +7,19 @@ const INVITATION_SERVICE_URL = process.env.INVITATION_SERVICE_URL || 'http://loc
 
 const checkBoardInvitation = async (boardId, userId, token) => {
   try {
-    const response = await axios.get(`${INVITATION_SERVICE_URL}/api/invitations/board/${boardId}/user/${userId}`, {
+    const url = boardId
+      ? `${INVITATION_SERVICE_URL}/api/invitations/board/${boardId}/user/${userId}`
+      : `${INVITATION_SERVICE_URL}/api/invitations/board/user/${userId}`;
+    const response = await axios.get(url, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    return response.data; // Trả về invitation nếu tồn tại
+    // Đảm bảo trả về danh sách lời mời (có thể rỗng)
+    return response.data || [];
   } catch (error) {
     if (error.response?.status === 404) {
-      return null; // Không tìm thấy lời mời
+      return [];
     }
-    throwError(ERROR_MESSAGES.INVITATION_SERVICE_UNAVAILABLE, STATUS_CODES.INTERNAL_SERVER_ERROR);
+    throwError(ERROR_MESSAGES.INVITATION_SERVICE_ERROR, STATUS_CODES.INTERNAL_SERVER_ERROR);
   }
 };
 
