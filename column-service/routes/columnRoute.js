@@ -1,12 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const {
+  authMiddleware,
   createColumn,
-  getColumnsByBoard,
-  getColumnById,
   updateColumn,
   deleteColumn,
-  authMiddleware,
+  getColumnsByBoard,
+  getColumnById,
 } = require('../controllers/columnController');
 const validate = require('../middleware/validate');
 const errorHandler = require('../middleware/errorHandler');
@@ -15,10 +15,10 @@ const { createColumnSchema, updateColumnSchema } = require('../validation/column
 router.use(authMiddleware);
 
 router.post('/', validate(createColumnSchema), createColumn);
+router.put('/:columnId', validate(updateColumnSchema), updateColumn);
+router.delete('/:columnId', deleteColumn);
 router.get('/board/:boardId', getColumnsByBoard);
-router.get('/:id', getColumnById);
-router.put('/:id', validate(updateColumnSchema), updateColumn);
-router.delete('/:id', deleteColumn);
+router.get('/:columnId', getColumnById);
 
 router.use(errorHandler);
 
