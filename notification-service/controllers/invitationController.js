@@ -2,7 +2,7 @@ const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const Invitation = require('../models/invitationModel');
 const { checkUserExists, checkUserExistsByEmail } = require('../services/user');
-const { checkBoardAccess, getBoardById } = require('../services/board');
+const { getBoardById } = require('../services/board');
 const { getColumnById } = require('../services/column');
 const { getCardById } = require('../services/card');
 const { extractToken, throwError, isValidObjectId } = require('../utils/helpers');
@@ -28,11 +28,16 @@ const validateInvitation = async (type, boardId, columnId, cardId, userId, invit
   }
   const invitedUser = await checkUserExists(invitedUserId, token);
   if (!invitedUser) {
-    throwError(ERROR_MESSAGES.USER_NOT_FOUND, STATUS_CODES.NOT_FOUND);
+    throwError(`${ERROR_MESSAGES.USER_NOT_FOUND}: ${invitedUserId}`, STATUS_CODES.NOT_FOUND);
   }
-  const board = await getBoardById(boardId, userId, token);
+  let board;
+  try {
+    board = await getBoardById(boardId, userId, token);
+  } catch (error) {
+    throwError(`${ERROR_MESSAGES.UNAUTHORIZED_OR_BOARD_NOT_FOUND}: boardId ${boardId}`, STATUS_CODES.FORBIDDEN);
+  }
   if (!board) {
-    throwError(ERROR_MESSAGES.UNAUTHORIZED_OR_BOARD_NOT_FOUND, STATUS_CODES.FORBIDDEN);
+    throwError(`${ERROR_MESSAGES.BOARD_NOT_FOUND}: boardId ${boardId}`, STATUS_CODES.NOT_FOUND);
   }
   if (board.userId.toString() !== userId) {
     throwError(ERROR_MESSAGES.NOT_BOARD_OWNER, STATUS_CODES.FORBIDDEN);
@@ -45,25 +50,77 @@ const validateInvitation = async (type, boardId, columnId, cardId, userId, invit
       status: 'accepted',
     });
     if (!boardInvitation) {
-      throwError(ERROR_MESSAGES.NOT_INVITED_TO_BOARD, STATUS_CODES.FORBIDDEN);
+      throwError(
+        `${ERROR_MESSAGES.NOT_INVITED_TO_BOARD}: user ${invitedUser.email} (ID: ${invitedUserId}) must be invited to board ${boardId} first`,
+        STATUS_CODES.FORBIDDEN
+      );
     }
   }
   if (type === 'column' || type === 'card') {
     if (!isValidObjectId(columnId)) {
       throwError(ERROR_MESSAGES.INVALID_COLUMN_ID, STATUS_CODES.BAD_REQUEST);
     }
-    const column = await getColumnById(columnId, userId, token);
+    let column;
+    try {
+      column = await getColumnById(columnId, userId, token);
+    } catch (error) {
+      if (error.statusCode === STATUS_CODES.FORBIDDEN) {
+        // Board owner có quyền truy cập, gọi lại API với quyền owner
+        try {
+          const response = await axios.get(`${COLUMN_SERVICE_URL}/api/columns/${columnId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          column = response.data;
+        } catch (err) {
+          throwError(
+            `${ERROR_MESSAGES.NOT_FOUND_COLUMN}: columnId ${columnId} not accessible`,
+            STATUS_CODES.NOT_FOUND
+          );
+        }
+      } else {
+        throw error;
+      }
+    }
     if (!column || column.boardId.toString() !== boardId.toString()) {
-      throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
+      throwError(
+        `${ERROR_MESSAGES.NOT_FOUND_COLUMN}: columnId ${columnId} does not exist or does not belong to board ${boardId}`,
+        STATUS_CODES.NOT_FOUND
+      );
     }
   }
   if (type === 'card') {
     if (!isValidObjectId(cardId)) {
       throwError(ERROR_MESSAGES.INVALID_CARD_ID, STATUS_CODES.BAD_REQUEST);
     }
-    const card = await getCardById(cardId, userId, token);
-    if (!card || card.columnId.toString() !== columnId.toString()) {
-      throwError(ERROR_MESSAGES.CARD_NOT_FOUND, STATUS_CODES.NOT_FOUND);
+    let card;
+    try {
+      card = await getCardById(cardId, userId, token);
+    } catch (error) {
+      if (error.statusCode === STATUS_CODES.FORBIDDEN) {
+        // Board owner có quyền truy cập, gọi lại API với quyền owner
+        try {
+          const response = await axios.get(`${CARD_SERVICE_URL}/api/cards/${cardId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          card = response.data;
+        } catch (err) {
+          throwError(
+            `${ERROR_MESSAGES.CARD_NOT_FOUND}: cardId ${cardId} not accessible`,
+            STATUS_CODES.NOT_FOUND
+          );
+        }
+      } else {
+        throw error;
+      }
+    }
+    if (!card) {
+      throwError(`${ERROR_MESSAGES.CARD_NOT_FOUND}: cardId ${cardId} does not exist`, STATUS_CODES.NOT_FOUND);
+    }
+    if (card.columnId.toString() !== columnId.toString()) {
+      throwError(
+        `${ERROR_MESSAGES.CARD_NOT_FOUND}: cardId ${cardId} does not belong to column ${columnId}`,
+        STATUS_CODES.NOT_FOUND
+      );
     }
     const columnInvitation = await Invitation.findOne({
       type: 'column',
@@ -73,7 +130,10 @@ const validateInvitation = async (type, boardId, columnId, cardId, userId, invit
       status: 'accepted',
     });
     if (!columnInvitation) {
-      throwError(ERROR_MESSAGES.NOT_INVITED_TO_COLUMN, STATUS_CODES.FORBIDDEN);
+      throwError(
+        `${ERROR_MESSAGES.NOT_INVITED_TO_COLUMN}: user ${invitedUser.email} (ID: ${invitedUserId}) must be invited to column ${columnId}`,
+        STATUS_CODES.FORBIDDEN
+      );
     }
   }
 };

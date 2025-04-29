@@ -4,6 +4,7 @@ const {
   createCard,
   getCardsByColumn,
   updateCard,
+  getCardById,
   deleteCard,
   authMiddleware,
 } = require('../controllers/cardController');
@@ -15,6 +16,7 @@ router.use(authMiddleware);
 
 router.post('/', validate(createCardSchema), createCard);
 router.get('/column/:columnId', getCardsByColumn);
+router.get('/:id', getCardById);
 router.put('/:id', validate(updateCardSchema), updateCard);
 router.delete('/:id', deleteCard);
 

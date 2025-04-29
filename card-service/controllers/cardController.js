@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const Card = require('../models/cardModel');
 const { getColumnById, updateColumnCardOrder } = require('../services/column');
 const { getBoardById } = require('../services/board');
@@ -29,7 +30,6 @@ const validateColumnAndBoard = async (columnId, userId, token) => {
       throwError(ERROR_MESSAGES.COLUMN_NOT_FOUND, STATUS_CODES.NOT_FOUND);
     }
     if (error.statusCode === STATUS_CODES.FORBIDDEN) {
-      // Board owner không cần lời mời column, nên bỏ qua lỗi 403
       const tempColumn = await Column.findById(columnId);
       if (!tempColumn) {
         throwError(ERROR_MESSAGES.COLUMN_NOT_FOUND, STATUS_CODES.NOT_FOUND);
@@ -39,9 +39,20 @@ const validateColumnAndBoard = async (columnId, userId, token) => {
       throw error;
     }
   }
-  const board = await getBoardById(column.boardId, userId, token);
-  if (!board) {
-    throwError(ERROR_MESSAGES.UNAUTHORIZED_OR_BOARD_NOT_FOUND, STATUS_CODES.FORBIDDEN);
+  let board;
+  try {
+    board = await getBoardById(column.boardId, userId, token);
+  } catch (error) {
+    if (error.statusCode === STATUS_CODES.NOT_FOUND || error.statusCode === STATUS_CODES.FORBIDDEN) {
+      // Board owner không cần lời mời board, truy vấn trực tiếp
+      const tempBoard = await Board.findById(column.boardId);
+      if (!tempBoard) {
+        throwError(ERROR_MESSAGES.BOARD_NOT_FOUND, STATUS_CODES.NOT_FOUND);
+      }
+      board = tempBoard;
+    } else {
+      throw error;
+    }
   }
   // Chỉ kiểm tra lời mời column nếu không phải board owner
   if (board.userId.toString() !== userId) {
