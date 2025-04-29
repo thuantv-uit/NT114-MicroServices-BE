@@ -1,9 +1,9 @@
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const Board = require('../models/boardModel');
-const { checkUserExists, checkUserExistsByEmail } = require('../services/user');
-const { extractToken, throwError, isValidObjectId } = require('../utils/helpers');
+const { checkUserExists } = require('../services/user');
 const { checkBoardInvitation } = require('../services/invitation');
+const { extractToken, throwError, isValidObjectId } = require('../utils/helpers');
 const { STATUS_CODES, ERROR_MESSAGES } = require('../utils/constants');
 
 const authMiddleware = (req, res, next) => {
@@ -28,6 +28,13 @@ const validateUserAndBoardAccess = async (boardId, userId, token) => {
   const board = await Board.findById(boardId);
   if (!board) {
     throwError(ERROR_MESSAGES.BOARD_NOT_FOUND, STATUS_CODES.NOT_FOUND);
+  }
+  // Kiểm tra user là owner hoặc được mời vào board
+  if (board.userId.toString() !== userId) {
+    const boardInvitation = await checkBoardInvitation(boardId, userId, token);
+    if (!boardInvitation || !boardInvitation.length) {
+      throwError(ERROR_MESSAGES.NOT_INVITED_TO_BOARD, STATUS_CODES.FORBIDDEN);
+    }
   }
   return { user, board };
 };
@@ -60,11 +67,24 @@ const getBoards = async (req, res, next) => {
     if (!user) {
       throwError(ERROR_MESSAGES.USER_NOT_FOUND, STATUS_CODES.NOT_FOUND);
     }
-    const invitations = await checkBoardInvitation(null, req.user.id, token); // Lấy tất cả lời mời board
-    const boardIds = invitations ? invitations.map(inv => inv.boardId) : [];
-    const boards = await Board.find({
-      $or: [{ userId: req.user.id }, { _id: { $in: boardIds } }],
+    // Lấy boards mà user là owner
+    const ownedBoards = await Board.find({ userId: req.user.id });
+
+    // Lấy boards mà user được mời vào
+    const invitations = await checkBoardInvitation(null, req.user.id, token);
+    const invitedBoardIds = invitations ? invitations.map(inv => inv.boardId.toString()) : [];
+
+    // Lấy thông tin các board mà user được mời
+    const invitedBoards = await Board.find({ _id: { $in: invitedBoardIds } });
+
+    // Gộp danh sách boards (loại bỏ trùng lặp nếu có)
+    const boards = [...ownedBoards];
+    invitedBoards.forEach(board => {
+      if (!boards.some(owned => owned._id.toString() === board._id.toString())) {
+        boards.push(board);
+      }
     });
+
     res.json(boards);
   } catch (error) {
     next(error);
@@ -82,12 +102,16 @@ const getBoardById = async (req, res, next) => {
     if (!user) {
       throwError(ERROR_MESSAGES.USER_NOT_FOUND, STATUS_CODES.NOT_FOUND);
     }
-    const invitation = await checkBoardInvitation(id, req.user.id, token);
-    const board = await Board.findOne({
-      $or: [{ _id: id, userId: req.user.id }, { _id: id, _id: invitation?.boardId }],
-    });
+    const board = await Board.findById(id);
     if (!board) {
-      throwError(ERROR_MESSAGES.UNAUTHORIZED_OR_BOARD_NOT_FOUND, STATUS_CODES.FORBIDDEN);
+      throwError(ERROR_MESSAGES.BOARD_NOT_FOUND, STATUS_CODES.NOT_FOUND);
+    }
+    // Kiểm tra user là owner hoặc được mời vào board
+    if (board.userId.toString() !== req.user.id) {
+      const boardInvitation = await checkBoardInvitation(id, req.user.id, token);
+      if (!boardInvitation || !boardInvitation.length) {
+        throwError(ERROR_MESSAGES.NOT_INVITED_TO_BOARD, STATUS_CODES.FORBIDDEN);
+      }
     }
     res.json(board);
   } catch (error) {
@@ -107,22 +131,11 @@ const updateBoard = async (req, res, next) => {
     if (board.userId.toString() !== req.user.id) {
       throwError(ERROR_MESSAGES.NOT_BOARD_OWNER, STATUS_CODES.FORBIDDEN);
     }
-    if (title) board.title = title;
-    if (description) board.description = description;
-    if (backgroundColor) board.backgroundColor = backgroundColor;
-    if (columnOrderIds) {
-      if (columnOrderIds.$push) {
-        if (!isValidObjectId(columnOrderIds.$push)) {
-          throwError(ERROR_MESSAGES.INVALID_COLUMN_ID, STATUS_CODES.BAD_REQUEST);
-        }
-        board.columnOrderIds.push(columnOrderIds.$push);
-      } else if (Array.isArray(columnOrderIds)) {
-        if (columnOrderIds.some(id => !isValidObjectId(id))) {
-          throwError(ERROR_MESSAGES.INVALID_COLUMN_ID, STATUS_CODES.BAD_REQUEST);
-        }
-        board.columnOrderIds = columnOrderIds;
-      }
-    }
+    board.title = title !== undefined ? title : board.title;
+    board.description = description !== undefined ? description : board.description;
+    board.backgroundColor = backgroundColor !== undefined ? backgroundColor : board.backgroundColor;
+    board.columnOrderIds = columnOrderIds !== undefined ? columnOrderIds : board.columnOrderIds;
+    board.updatedAt = Date.now();
     await board.save();
     res.json(board);
   } catch (error) {
