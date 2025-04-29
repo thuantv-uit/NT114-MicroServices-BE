@@ -4,8 +4,9 @@ const Card = require('../models/cardModel');
 const { getColumnById, updateColumnCardOrder } = require('../services/column');
 const { getBoardById } = require('../services/board');
 const { checkCardInvitation, checkColumnInvitation } = require('../services/invitation');
-const { extractToken, throwError } = require('../utils/helpers');
+const { extractToken, throwError, isValidObjectId } = require('../utils/helpers');
 const { STATUS_CODES, ERROR_MESSAGES } = require('../utils/constants');
+const { validateUserAndBoardAccess } = require('../utils/permissions');
 
 const authMiddleware = (req, res, next) => {
   const token = extractToken(req);
@@ -68,13 +69,27 @@ const createCard = async (req, res, next) => {
   try {
     const { title, description, columnId } = req.body;
     const token = extractToken(req);
-    const { column, board } = await validateColumnAndBoard(columnId, req.user.id, token);
+    if (!isValidObjectId(columnId)) {
+      throwError(ERROR_MESSAGES.INVALID_COLUMN_ID, STATUS_CODES.BAD_REQUEST);
+    }
+    // Kiểm tra column có tồn tại không bằng cách gọi API của Column Service
+    const column = await getColumnById(columnId, req.user.id, token);
+    if (!column) {
+      throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
+    }
+    const { board } = await validateUserAndBoardAccess(column.boardId, req.user.id, token);
+    // Chỉ board owner được tạo card
     if (board.userId.toString() !== req.user.id) {
       throwError(ERROR_MESSAGES.NOT_BOARD_OWNER, STATUS_CODES.FORBIDDEN);
     }
+
     const card = new Card({ title, description, columnId });
     await card.save();
-    await updateColumnCardOrder(columnId, card._id, token);
+
+    // Cập nhật cardOrderIds trong column bằng cách gọi API của Column Service
+    const newCardOrderIds = [...(column.cardOrderIds || []), card._id.toString()];
+    await updateColumnCardOrder(columnId, newCardOrderIds, token);
+
     res.status(STATUS_CODES.CREATED).json(card);
   } catch (error) {
     next(error);
