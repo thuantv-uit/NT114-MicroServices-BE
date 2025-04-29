@@ -1,3 +1,5 @@
+const mongoose = require('mongoose');
+
 const extractToken = (req) => {
     return req.header('Authorization')?.replace('Bearer ', '');
   };
@@ -7,5 +9,9 @@ const extractToken = (req) => {
     error.statusCode = statusCode;
     throw error;
   };
+
+  const isValidObjectId = (id) => {
+    return mongoose.Types.ObjectId.isValid(id);
+  };
   
-  module.exports = { extractToken, throwError };
+  module.exports = { extractToken, throwError, isValidObjectId };

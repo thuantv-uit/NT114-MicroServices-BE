@@ -60,10 +60,22 @@ const updateColumn = async (req, res, next) => {
       throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
     }
     const { board } = await validateUserAndBoardAccess(column.boardId, req.user.id, token);
-    // Chỉ board owner được sửa column
     if (board.userId.toString() !== req.user.id) {
       throwError(ERROR_MESSAGES.NOT_BOARD_OWNER, STATUS_CODES.FORBIDDEN);
     }
+
+    // Kiểm tra cardOrderIds nếu được gửi
+    if (cardOrderIds !== undefined) {
+      if (!Array.isArray(cardOrderIds)) {
+        throwError('cardOrderIds must be an array', STATUS_CODES.BAD_REQUEST);
+      }
+      cardOrderIds.forEach(id => {
+        if (!isValidObjectId(id)) {
+          throwError(`Invalid card ID in cardOrderIds: ${id}`, STATUS_CODES.BAD_REQUEST);
+        }
+      });
+    }
+
     column.title = title !== undefined ? title : column.title;
     column.cardOrderIds = cardOrderIds !== undefined ? cardOrderIds : column.cardOrderIds;
     column.updatedAt = Date.now();
