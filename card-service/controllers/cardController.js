@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const Card = require('../models/cardModel');
 const { getColumnById, updateColumnCardOrder } = require('../services/column');
 const { getBoardById } = require('../services/board');
-const { checkCardInvitation, checkColumnInvitation } = require('../services/invitation');
+const { checkCardInvitation, checkColumnInvitation, checkBoardInvitation } = require('../services/invitation');
 const { extractToken, throwError, isValidObjectId } = require('../utils/helpers');
 const { STATUS_CODES, ERROR_MESSAGES } = require('../utils/constants');
 const { validateUserAndBoardAccess } = require('../utils/permissions');
@@ -100,20 +100,29 @@ const getCardsByColumn = async (req, res, next) => {
   try {
     const { columnId } = req.params;
     const token = extractToken(req);
-    const { board } = await validateColumnAndBoard(columnId, req.user.id, token);
-    let cardIds = [];
-    // Board owner thấy tất cả card trong column
-    if (board.userId.toString() === req.user.id) {
-      const cards = await Card.find({ columnId });
-      cardIds = cards.map(card => card._id);
-    } else {
-      const invitations = await checkCardInvitation(null, req.user.id, token);
-      cardIds = invitations
-        ? invitations.filter(inv => inv.columnId.toString() === columnId).map(inv => inv.cardId)
-        : [];
+    if (!isValidObjectId(columnId)) {
+      throwError(ERROR_MESSAGES.INVALID_COLUMN_ID, STATUS_CODES.BAD_REQUEST);
     }
-    const cards = await Card.find({ columnId, _id: { $in: cardIds } });
-    res.json(cards);
+    const column = await getColumnById(columnId, req.user.id, token);
+    if (!column) {
+      throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
+    }
+    const { board } = await validateUserAndBoardAccess(column.boardId, req.user.id, token);
+
+    const allCards = await Card.find({ columnId });
+
+    if (board.userId.toString() === req.user.id) {
+      return res.json(allCards);
+    }
+
+    const cardInvitations = await checkCardInvitation(null, req.user.id, token);
+    const allowedCardIds = cardInvitations
+      ? cardInvitations
+          .filter(inv => inv.columnId.toString() === columnId)
+          .map(inv => inv.cardId.toString())
+      : [];
+    const allowedCards = allCards.filter(card => allowedCardIds.includes(card._id.toString()));
+    res.json(allowedCards);
   } catch (error) {
     next(error);
   }
@@ -144,45 +153,71 @@ const getCardById = async (req, res, next) => {
   }
 };
 
-const updateCard = async (req, res, next) => {
+const deleteCard = async (req, res, next) => {
   try {
-    const { id } = req.params;
-    const { title, description } = req.body;
+    const { cardId } = req.params;
     const token = extractToken(req);
-    const card = await Card.findById(id);
+    if (!isValidObjectId(cardId)) {
+      throwError(ERROR_MESSAGES.INVALID_CARD_ID, STATUS_CODES.BAD_REQUEST);
+    }
+    const card = await Card.findById(cardId);
     if (!card) {
       throwError(ERROR_MESSAGES.CARD_NOT_FOUND, STATUS_CODES.NOT_FOUND);
     }
-    const { column, board } = await validateColumnAndBoard(card.columnId, req.user.id, token);
-    const cardInvitation = await checkCardInvitation(id, req.user.id, token);
-    if (board.userId.toString() !== req.user.id && !cardInvitation) {
-      throwError(ERROR_MESSAGES.UNAUTHORIZED, STATUS_CODES.FORBIDDEN);
+    const column = await getColumnById(card.columnId, req.user.id, token);
+    if (!column) {
+      throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
     }
-    card.title = title || card.title;
-    card.description = description || card.description;
-    card.updatedAt = Date.now();
-    await card.save();
-    res.json(card);
+    const { board } = await validateUserAndBoardAccess(column.boardId, req.user.id, token);
+    // Chỉ board owner được xóa card
+    if (board.userId.toString() !== req.user.id) {
+      throwError(ERROR_MESSAGES.NOT_BOARD_OWNER, STATUS_CODES.FORBIDDEN);
+    }
+
+    await card.deleteOne();
+
+    const newCardOrderIds = column.cardOrderIds.filter(id => id.toString() !== cardId);
+    await updateColumnCardOrder(column.cardId, newCardOrderIds, token);
+
+    res.json({ message: ERROR_MESSAGES.CARD_DELETED });
   } catch (error) {
     next(error);
   }
 };
 
-const deleteCard = async (req, res, next) => {
+const updateCard = async (req, res, next) => {
   try {
-    const { id } = req.params;
+    const { cardId } = req.params;
+    const { title, description } = req.body;
     const token = extractToken(req);
-    const card = await Card.findById(id);
+    if (!isValidObjectId(cardId)) {
+      throwError(ERROR_MESSAGES.INVALID_CARD_ID, STATUS_CODES.BAD_REQUEST);
+    }
+    const card = await Card.findById(cardId);
     if (!card) {
       throwError(ERROR_MESSAGES.CARD_NOT_FOUND, STATUS_CODES.NOT_FOUND);
     }
-    const { column, board } = await validateColumnAndBoard(card.columnId, req.user.id, token);
-    const cardInvitation = await checkCardInvitation(id, req.user.id, token);
-    if (board.userId.toString() !== req.user.id && !cardInvitation) {
-      throwError(ERROR_MESSAGES.UNAUTHORIZED, STATUS_CODES.FORBIDDEN);
+    const column = await getColumnById(card.columnId, req.user.id, token);
+    if (!column) {
+      throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
     }
-    await card.deleteOne();
-    res.json({ message: ERROR_MESSAGES.CARD_DELETED });
+    const { board } = await validateUserAndBoardAccess(column.boardId, req.user.id, token);
+
+    // Kiểm tra quyền chỉnh sửa
+    if (board.userId.toString() !== req.user.id) {
+      // Nếu không phải board owner, kiểm tra xem user có được mời vào card không
+      const cardInvitations = await checkCardInvitation(cardId, req.user.id, token);
+      const hasInvitation = cardInvitations.some(inv => inv.cardId.toString() === cardId);
+      if (!hasInvitation) {
+        throwError(ERROR_MESSAGES.NOT_INVITED_TO_CARD, STATUS_CODES.FORBIDDEN);
+      }
+    }
+
+    card.title = title !== undefined ? title : card.title;
+    card.description = description !== undefined ? description : card.description;
+    card.updatedAt = Date.now();
+    await card.save();
+    res.json(card);
   } catch (error) {
     next(error);
   }
