@@ -155,29 +155,32 @@ const getCardById = async (req, res, next) => {
 
 const deleteCard = async (req, res, next) => {
   try {
-    const { cardId } = req.params;
+    const { id } = req.params;
     const token = extractToken(req);
-    if (!isValidObjectId(cardId)) {
+    // Check valid id
+    if (!isValidObjectId(id)) {
       throwError(ERROR_MESSAGES.INVALID_CARD_ID, STATUS_CODES.BAD_REQUEST);
     }
-    const card = await Card.findById(cardId);
+    // Find card
+    const card = await Card.findById(id);
     if (!card) {
       throwError(ERROR_MESSAGES.CARD_NOT_FOUND, STATUS_CODES.NOT_FOUND);
     }
-    const column = await getColumnById(card.columnId, req.user.id, token);
-    if (!column) {
-      throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
+    // Check valid columnId
+    if (!card.columnId || !isValidObjectId(card.columnId)) {
+      throwError(ERROR_MESSAGES.INVALID_COLUMN_ID, STATUS_CODES.BAD_REQUEST);
     }
-    const { board } = await validateUserAndBoardAccess(column.boardId, req.user.id, token);
-    // Chỉ board owner được xóa card
+    // Check column and board
+    const { column, board } = await validateColumnAndBoard(card.columnId, req.user.id, token);
+    // Only board owner can delete card
     if (board.userId.toString() !== req.user.id) {
       throwError(ERROR_MESSAGES.NOT_BOARD_OWNER, STATUS_CODES.FORBIDDEN);
     }
-
+    // Delete card
     await card.deleteOne();
-
-    const newCardOrderIds = column.cardOrderIds.filter(id => id.toString() !== cardId);
-    await updateColumnCardOrder(column.cardId, newCardOrderIds, token);
+    // Update cardOrderIds in column
+    const newCardOrderIds = column.cardOrderIds.filter(id => id.toString() !== id);
+    await updateColumnCardOrder(column._id, newCardOrderIds, token);
 
     res.json({ message: ERROR_MESSAGES.CARD_DELETED });
   } catch (error) {
@@ -187,36 +190,42 @@ const deleteCard = async (req, res, next) => {
 
 const updateCard = async (req, res, next) => {
   try {
-    const { cardId } = req.params;
+    const { id } = req.params;
     const { title, description } = req.body;
     const token = extractToken(req);
-    if (!isValidObjectId(cardId)) {
+    // Check valid id
+    if (!isValidObjectId(id)) {
       throwError(ERROR_MESSAGES.INVALID_CARD_ID, STATUS_CODES.BAD_REQUEST);
     }
-    const card = await Card.findById(cardId);
+
+    // Find card
+    const card = await Card.findById(id);
     if (!card) {
       throwError(ERROR_MESSAGES.CARD_NOT_FOUND, STATUS_CODES.NOT_FOUND);
     }
-    const column = await getColumnById(card.columnId, req.user.id, token);
-    if (!column) {
-      throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
-    }
-    const { board } = await validateUserAndBoardAccess(column.boardId, req.user.id, token);
 
-    // Kiểm tra quyền chỉnh sửa
+    // Check valid columnId
+    if (!card.columnId || !isValidObjectId(card.columnId)) {
+      throwError(ERROR_MESSAGES.INVALID_COLUMN_ID, STATUS_CODES.BAD_REQUEST);
+    }
+
+    // Check column and board
+    const { column, board } = await validateColumnAndBoard(card.columnId, req.user.id, token);
+
+    // Check if user is board owner
     if (board.userId.toString() !== req.user.id) {
-      // Nếu không phải board owner, kiểm tra xem user có được mời vào card không
-      const cardInvitations = await checkCardInvitation(cardId, req.user.id, token);
-      const hasInvitation = cardInvitations.some(inv => inv.cardId.toString() === cardId);
-      if (!hasInvitation) {
+      const cardInvitation = await checkCardInvitation(id, req.user.id, token);
+      if (!cardInvitation) {
         throwError(ERROR_MESSAGES.NOT_INVITED_TO_CARD, STATUS_CODES.FORBIDDEN);
       }
     }
 
+    // Update card
     card.title = title !== undefined ? title : card.title;
     card.description = description !== undefined ? description : card.description;
     card.updatedAt = Date.now();
     await card.save();
+
     res.json(card);
   } catch (error) {
     next(error);
