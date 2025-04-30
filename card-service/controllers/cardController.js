@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const Card = require('../models/cardModel');
 const { getColumnById, updateColumnCardOrder } = require('../services/column');
 const { getBoardById } = require('../services/board');
-const { checkCardInvitation, checkColumnInvitation, checkBoardInvitation } = require('../services/invitation');
+const { checkCardInvitation, checkColumnInvitation, checkBoardInvitation, checkCardsInvitedInColumn } = require('../services/invitation');
 const { extractToken, throwError, isValidObjectId } = require('../utils/helpers');
 const { STATUS_CODES, ERROR_MESSAGES } = require('../utils/constants');
 const { validateUserAndBoardAccess } = require('../utils/permissions');
@@ -31,7 +31,7 @@ const validateColumnAndBoard = async (columnId, userId, token) => {
       throwError(ERROR_MESSAGES.COLUMN_NOT_FOUND, STATUS_CODES.NOT_FOUND);
     }
     if (error.statusCode === STATUS_CODES.FORBIDDEN) {
-      const tempColumn = await Column.findById(columnId);
+      const tempColumn = await mongoose.model('Column').findById(columnId);
       if (!tempColumn) {
         throwError(ERROR_MESSAGES.COLUMN_NOT_FOUND, STATUS_CODES.NOT_FOUND);
       }
@@ -45,8 +45,7 @@ const validateColumnAndBoard = async (columnId, userId, token) => {
     board = await getBoardById(column.boardId, userId, token);
   } catch (error) {
     if (error.statusCode === STATUS_CODES.NOT_FOUND || error.statusCode === STATUS_CODES.FORBIDDEN) {
-      // Board owner không cần lời mời board, truy vấn trực tiếp
-      const tempBoard = await Board.findById(column.boardId);
+      const tempBoard = await mongoose.model('Board').findById(column.boardId);
       if (!tempBoard) {
         throwError(ERROR_MESSAGES.BOARD_NOT_FOUND, STATUS_CODES.NOT_FOUND);
       }
@@ -57,8 +56,8 @@ const validateColumnAndBoard = async (columnId, userId, token) => {
   }
   // Chỉ kiểm tra lời mời column nếu không phải board owner
   if (board.userId.toString() !== userId) {
-    const columnInvitation = await checkColumnInvitation(columnId, userId, token);
-    if (!columnInvitation) {
+    const columnInvitation = await checkColumnInvitation(null, columnId, userId, token);
+    if (!columnInvitation.length) {
       throwError(ERROR_MESSAGES.NOT_INVITED_TO_COLUMN, STATUS_CODES.FORBIDDEN);
     }
   }
@@ -72,21 +71,25 @@ const createCard = async (req, res, next) => {
     if (!isValidObjectId(columnId)) {
       throwError(ERROR_MESSAGES.INVALID_COLUMN_ID, STATUS_CODES.BAD_REQUEST);
     }
-    // Kiểm tra column có tồn tại không bằng cách gọi API của Column Service
+    // Kiểm tra column có tồn tại không
     const column = await getColumnById(columnId, req.user.id, token);
     if (!column) {
       throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
     }
     const { board } = await validateUserAndBoardAccess(column.boardId, req.user.id, token);
-    // Chỉ board owner được tạo card
+    
+    // Kiểm tra quyền: board owner hoặc người được mời vào column
     if (board.userId.toString() !== req.user.id) {
-      throwError(ERROR_MESSAGES.NOT_BOARD_OWNER, STATUS_CODES.FORBIDDEN);
+      const columnInvitation = await checkColumnInvitation(null, columnId, req.user.id, token);
+      if (!columnInvitation.length) {
+        throwError(ERROR_MESSAGES.NOT_INVITED_TO_COLUMN, STATUS_CODES.FORBIDDEN);
+      }
     }
 
     const card = new Card({ title, description, columnId });
     await card.save();
 
-    // Cập nhật cardOrderIds trong column bằng cách gọi API của Column Service
+    // Cập nhật cardOrderIds trong column
     const newCardOrderIds = [...(column.cardOrderIds || []), card._id.toString()];
     await updateColumnCardOrder(columnId, newCardOrderIds, token);
 
@@ -115,12 +118,10 @@ const getCardsByColumn = async (req, res, next) => {
       return res.json(allCards);
     }
 
-    const cardInvitations = await checkCardInvitation(null, req.user.id, token);
+    const cardInvitations = await checkCardsInvitedInColumn(columnId, req.user.id, token);
     const allowedCardIds = cardInvitations
-      ? cardInvitations
-          .filter(inv => inv.columnId.toString() === columnId)
-          .map(inv => inv.cardId.toString())
-      : [];
+      .filter(inv => inv.status === 'accepted')
+      .map(inv => inv.cardId.toString());
     const allowedCards = allCards.filter(card => allowedCardIds.includes(card._id.toString()));
     res.json(allowedCards);
   } catch (error) {
@@ -140,10 +141,10 @@ const getCardById = async (req, res, next) => {
       throwError(ERROR_MESSAGES.CARD_NOT_FOUND, STATUS_CODES.NOT_FOUND);
     }
     const { column, board } = await validateColumnAndBoard(card.columnId, req.user.id, token);
-    // Cho phép board owner truy cập mà không cần lời mời card
+    // Cho phép board owner hoặc người được mời vào card truy cập
     if (board.userId.toString() !== req.user.id) {
-      const cardInvitation = await checkCardInvitation(id, req.user.id, token);
-      if (!cardInvitation) {
+      const cardInvitations = await checkCardInvitation(id, req.user.id, token);
+      if (!cardInvitations.some(inv => inv.status === 'accepted')) {
         throwError(ERROR_MESSAGES.UNAUTHORIZED, STATUS_CODES.FORBIDDEN);
       }
     }
@@ -157,29 +158,26 @@ const deleteCard = async (req, res, next) => {
   try {
     const { id } = req.params;
     const token = extractToken(req);
-    // Check valid id
     if (!isValidObjectId(id)) {
       throwError(ERROR_MESSAGES.INVALID_CARD_ID, STATUS_CODES.BAD_REQUEST);
     }
-    // Find card
     const card = await Card.findById(id);
     if (!card) {
       throwError(ERROR_MESSAGES.CARD_NOT_FOUND, STATUS_CODES.NOT_FOUND);
     }
-    // Check valid columnId
     if (!card.columnId || !isValidObjectId(card.columnId)) {
       throwError(ERROR_MESSAGES.INVALID_COLUMN_ID, STATUS_CODES.BAD_REQUEST);
     }
-    // Check column and board
     const { column, board } = await validateColumnAndBoard(card.columnId, req.user.id, token);
-    // Only board owner can delete card
+    // Cho phép board owner hoặc người được mời vào card xóa
     if (board.userId.toString() !== req.user.id) {
-      throwError(ERROR_MESSAGES.NOT_BOARD_OWNER, STATUS_CODES.FORBIDDEN);
+      const cardInvitations = await checkCardInvitation(id, req.user.id, token);
+      if (!cardInvitations.some(inv => inv.status === 'accepted')) {
+        throwError(ERROR_MESSAGES.NOT_INVITED_TO_CARD, STATUS_CODES.FORBIDDEN);
+      }
     }
-    // Delete card
     await card.deleteOne();
-    // Update cardOrderIds in column
-    const newCardOrderIds = column.cardOrderIds.filter(id => id.toString() !== id);
+    const newCardOrderIds = column.cardOrderIds.filter(cardId => cardId.toString() !== id);
     await updateColumnCardOrder(column._id, newCardOrderIds, token);
 
     res.json({ message: ERROR_MESSAGES.CARD_DELETED });
@@ -193,34 +191,24 @@ const updateCard = async (req, res, next) => {
     const { id } = req.params;
     const { title, description } = req.body;
     const token = extractToken(req);
-    // Check valid id
     if (!isValidObjectId(id)) {
       throwError(ERROR_MESSAGES.INVALID_CARD_ID, STATUS_CODES.BAD_REQUEST);
     }
-
-    // Find card
     const card = await Card.findById(id);
     if (!card) {
       throwError(ERROR_MESSAGES.CARD_NOT_FOUND, STATUS_CODES.NOT_FOUND);
     }
-
-    // Check valid columnId
     if (!card.columnId || !isValidObjectId(card.columnId)) {
       throwError(ERROR_MESSAGES.INVALID_COLUMN_ID, STATUS_CODES.BAD_REQUEST);
     }
-
-    // Check column and board
     const { column, board } = await validateColumnAndBoard(card.columnId, req.user.id, token);
-
-    // Check if user is board owner
+    // Cho phép board owner hoặc người được mời vào card sửa
     if (board.userId.toString() !== req.user.id) {
-      const cardInvitation = await checkCardInvitation(id, req.user.id, token);
-      if (!cardInvitation) {
+      const cardInvitations = await checkCardInvitation(id, req.user.id, token);
+      if (!cardInvitations.some(inv => inv.status === 'accepted')) {
         throwError(ERROR_MESSAGES.NOT_INVITED_TO_CARD, STATUS_CODES.FORBIDDEN);
       }
     }
-
-    // Update card
     card.title = title !== undefined ? title : card.title;
     card.description = description !== undefined ? description : card.description;
     card.updatedAt = Date.now();
