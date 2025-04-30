@@ -65,7 +65,6 @@ const validateInvitation = async (type, boardId, columnId, cardId, userId, invit
       column = await getColumnById(columnId, userId, token);
     } catch (error) {
       if (error.statusCode === STATUS_CODES.FORBIDDEN) {
-        // Board owner có quyền truy cập, gọi lại API với quyền owner
         try {
           const response = await axios.get(`${COLUMN_SERVICE_URL}/api/columns/${columnId}`, {
             headers: { Authorization: `Bearer ${token}` },
@@ -97,7 +96,6 @@ const validateInvitation = async (type, boardId, columnId, cardId, userId, invit
       card = await getCardById(cardId, userId, token);
     } catch (error) {
       if (error.statusCode === STATUS_CODES.FORBIDDEN) {
-        // Board owner có quyền truy cập, gọi lại API với quyền owner
         try {
           const response = await axios.get(`${CARD_SERVICE_URL}/api/cards/${cardId}`, {
             headers: { Authorization: `Bearer ${token}` },
@@ -359,6 +357,51 @@ const getCardInvitations = async (req, res, next) => {
   }
 };
 
+const getAllColumnsInvited = async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    const token = extractToken(req);
+    
+    if (!isValidObjectId(userId)) {
+      throwError(ERROR_MESSAGES.INVALID_ID, STATUS_CODES.BAD_REQUEST);
+    }
+    
+    const invitations = await Invitation.find({
+      userId,
+      type: 'column',
+    }).select('boardId columnId status createdAt updatedAt');
+    
+    res.json(invitations);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getCardsInvitedInColumn = async (req, res, next) => {
+  try {
+    const { columnId, userId } = req.params;
+    const token = extractToken(req);
+    
+    if (!isValidObjectId(columnId) || !isValidObjectId(userId)) {
+      throwError(ERROR_MESSAGES.INVALID_ID, STATUS_CODES.BAD_REQUEST);
+    }
+    
+    const invitations = await Invitation.find({
+      userId,
+      type: 'card',
+      columnId,
+    }).select('boardId columnId cardId status createdAt updatedAt');
+    
+    if (!invitations.length) {
+      throwError(ERROR_MESSAGES.INVITATION_NOT_FOUND, STATUS_CODES.NOT_FOUND);
+    }
+    
+    res.json(invitations);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   authMiddleware,
   inviteToBoard,
@@ -369,4 +412,6 @@ module.exports = {
   getBoardInvitations,
   getColumnInvitations,
   getCardInvitations,
+  getAllColumnsInvited,
+  getCardsInvitedInColumn,
 };

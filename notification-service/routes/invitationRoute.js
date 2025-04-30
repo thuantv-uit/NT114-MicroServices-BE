@@ -10,6 +10,8 @@ const {
   getBoardInvitations,
   getColumnInvitations,
   getCardInvitations,
+  getAllColumnsInvited,
+  getCardsInvitedInColumn,
 } = require('../controllers/invitationController');
 const validate = require('../middleware/validate');
 const errorHandler = require('../middleware/errorHandler');
@@ -28,6 +30,8 @@ router.get('/column/:columnId/user/:userId', getColumnInvitations);
 router.get('/column/board/:boardId/user/:userId', getColumnInvitations);
 router.get('/card/:cardId/user/:userId', getCardInvitations);
 router.get('/card/user/:userId', getCardInvitations);
+router.get('/columns/user/:userId', getAllColumnsInvited);
+router.get('/cards/column/:columnId/user/:userId', getCardsInvitedInColumn);
 
 router.use(errorHandler);
 
