@@ -402,6 +402,60 @@ const getCardsInvitedInColumn = async (req, res, next) => {
   }
 };
 
+const getPendingBoardInvitations = async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    const token = extractToken(req);
+    if (!isValidObjectId(userId)) {
+      throwError(ERROR_MESSAGES.INVALID_ID, STATUS_CODES.BAD_REQUEST);
+    }
+    const invitations = await Invitation.find({
+      userId,
+      type: 'board',
+      status: 'pending',
+    });
+    res.json(invitations);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getPendingColumnInvitations = async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    const token = extractToken(req);
+    if (!isValidObjectId(userId)) {
+      throwError(ERROR_MESSAGES.INVALID_ID, STATUS_CODES.BAD_REQUEST);
+    }
+    const invitations = await Invitation.find({
+      userId,
+      type: 'column',
+      status: 'pending',
+    });
+    res.json(invitations);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getPendingCardInvitations = async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    const token = extractToken(req);
+    if (!isValidObjectId(userId)) {
+      throwError(ERROR_MESSAGES.INVALID_ID, STATUS_CODES.BAD_REQUEST);
+    }
+    const invitations = await Invitation.find({
+      userId,
+      type: 'card',
+      status: 'pending',
+    });
+    res.json(invitations);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   authMiddleware,
   inviteToBoard,
@@ -414,4 +468,7 @@ module.exports = {
   getCardInvitations,
   getAllColumnsInvited,
   getCardsInvitedInColumn,
+  getPendingBoardInvitations,
+  getPendingColumnInvitations,
+  getPendingCardInvitations
 };
