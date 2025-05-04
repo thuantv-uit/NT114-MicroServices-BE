@@ -12,6 +12,9 @@ const {
   getCardInvitations,
   getAllColumnsInvited,
   getCardsInvitedInColumn,
+  getPendingBoardInvitations,
+  getPendingColumnInvitations,
+  getPendingCardInvitations
 } = require('../controllers/invitationController');
 const validate = require('../middleware/validate');
 const errorHandler = require('../middleware/errorHandler');
@@ -32,6 +35,9 @@ router.get('/card/:cardId/user/:userId', getCardInvitations);
 router.get('/card/user/:userId', getCardInvitations);
 router.get('/columns/user/:userId', getAllColumnsInvited);
 router.get('/cards/column/:columnId/user/:userId', getCardsInvitedInColumn);
+router.get('/pending/board/:userId', getPendingBoardInvitations);
+router.get('/pending/column/:userId', getPendingColumnInvitations);
+router.get('/pending/card/:userId', getPendingCardInvitations);
 
 router.use(errorHandler);
 
