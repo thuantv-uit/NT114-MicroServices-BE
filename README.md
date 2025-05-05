@@ -11,7 +11,7 @@ This project is a task management system built using a **microservice architectu
 
 ## Service Structure
 
-The project is divided into 4 independent microservices:
+The project is divided into 5 independent microservices:
 
 - **User Service**  
   - **Description**: Manages user information (registration, login, profile updates, etc.).  
@@ -33,13 +33,18 @@ The project is divided into 4 independent microservices:
   - **Port**: `3004`  
   - **Main Functionality**: Details specific tasks.
 
+- **Invitation Service**  
+  - **Description**: Manages invitations for boards (create, send, accept invitations).  
+  - **Port**: `3005`  
+  - **Main Functionality**: Handles board collaboration invitations.
+  
 ---
 
 ## Technologies Used
 - **Programming Language**: Node.js  
 - **Database**: MongoDB  
 - **Architecture**: Microservice  
-- **Port Management**: Each service runs on a separate port (3001, 3002, 3003, 3004).  
+- **Port Management**: Each service runs on a separate port (3001, 3002, 3003, 3004, 3005).  
 
 ---
 
@@ -86,6 +91,7 @@ cd user && npm start
 cd board && npm start
 cd column && npm start
 cd card && npm start
+cd notification-service && npm start
 ```
 
 ### Usage
@@ -95,6 +101,7 @@ User Service: http://localhost:3001
 Board Service: http://localhost:3002
 Column Service: http://localhost:3003
 Card Service: http://localhost:3004
+Invitation Service: http://localhost:3005
 Use the APIs defined in each service to interact with the system.
 
 ### Feedback and Contact
