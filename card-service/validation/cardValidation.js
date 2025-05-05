@@ -6,7 +6,7 @@ const createCardSchema = Joi.object({
     'string.max': 'Title must not exceed 100 characters',
     'any.required': 'Title is required',
   }),
-  description: Joi.string().max(500).optional().messages({
+  description: Joi.string().max(500000).optional().messages({
     'string.max': 'Description must not exceed 500 characters',
   }),
   columnId: Joi.string().length(24).hex().required().messages({

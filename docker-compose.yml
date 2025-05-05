@@ -1,9 +1,24 @@
 version: '3.8'
 
 services:
+  # Microservice: invitation
+  invitation:
+    build:
+      context: ./notification-service
+    image: nt114-microservice-be-invitation:latest
+    ports:
+      - "3005:3005"
+    environment:
+      - MONGO_URI=mongodb+srv://thuantv:22521448@cluster0.nopqraq.mongodb.net/
+      - DATABASE_NAME=NT114
+    networks:
+      - app-network
+
   # Microservice: card
   card:
-    image: thuan410/nt114-be-card:v1
+    build:
+      context: ./card-service
+    image: nt114-microservice-be-card:latest
     ports:
       - "3004:3004"
     environment:
@@ -14,7 +29,9 @@ services:
 
   # Microservice: column
   column:
-    image: thuan410/nt114-be-column:v1
+    build:
+      context: ./column-service
+    image: nt114-microservice-be-column:latest
     ports:
       - "3003:3003"
     environment:
@@ -25,7 +42,9 @@ services:
 
   # Microservice: board
   board:
-    image: thuan410/nt114-be-board:v1
+    build:
+      context: ./board-service
+    image: nt114-microservice-be-board:latest
     ports:
       - "3002:3002"
     environment:
@@ -36,7 +55,9 @@ services:
 
   # Microservice: user
   user:
-    image: thuan410/nt114-be-user:v1
+    build:
+      context: ./user-service
+    image: nt114-microservice-be-user:latest
     ports:
       - "3001:3001"
     environment:
