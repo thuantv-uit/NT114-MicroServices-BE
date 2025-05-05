@@ -87,10 +87,10 @@ mongod
 ### 5. Run Each Service
 
 ```bash
-cd user && npm start
-cd board && npm start
-cd column && npm start
-cd card && npm start
+cd user-service && npm start
+cd board-service && npm start
+cd column-service && npm start
+cd card-service && npm start
 cd notification-service && npm start
 ```
 
