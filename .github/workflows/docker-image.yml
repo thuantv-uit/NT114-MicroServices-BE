@@ -1,0 +1,33 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Bước 1: Checkout mã nguồn
+      - uses: actions/checkout@v4
+
+      # Bước 2: Thiết lập Docker Buildx
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Bước 3: Validate docker-compose file
+      - name: Validate docker-compose
+        run: docker-compose -f docker-compose.yml config --quiet
+
+      # Bước 4: Build Docker images với tag động
+      - name: Build Docker images
+        env:
+          TAG: ${{ github.sha }}
+        run: docker-compose -f docker-compose.yml build
+
+      # Bước 5: Kiểm tra images đã build
+      - name: List built images
+        run: docker images | grep nt114-microservice-be
