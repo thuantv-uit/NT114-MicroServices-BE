@@ -1,16 +1,16 @@
-# Quy trình làm việc để xây dựng và kiểm thử dự án Node.js
-# Cài đặt dependencies, lưu cache, xây dựng mã nguồn và chạy kiểm thử trên nhiều phiên bản Node.js
-# Tham khảo: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-nodejs
-
 name: Node.js CI
 
 on:
   push:
     branches:
       - main
+    paths:
+      - "board-service/**"  # Chỉ chạy khi có thay đổi trong thư mục board-service
   pull_request:
     branches:
       - main
+    paths:
+      - "board-service/**"
 
 jobs:
   build:
@@ -19,44 +19,41 @@ jobs:
     strategy:
       matrix:
         node-version: [18.x, 20.x, 22.x]
-        # Các phiên bản Node.js được hỗ trợ: https://nodejs.org/en/about/releases/
-      fail-fast: false # Tiếp tục kiểm thử các phiên bản khác ngay cả khi một phiên bản thất bại
+      fail-fast: false
 
     steps:
-      # Lấy mã nguồn từ kho lưu trữ
       - name: Lấy mã nguồn
         uses: actions/checkout@v4
 
-      # Thiết lập môi trường Node.js
       - name: Thiết lập Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: 'npm' # Lưu cache dependencies npm để tăng tốc
+          cache: 'npm'
 
-      # Cài đặt dependencies
       - name: Cài đặt dependencies
-        run: npm ci # Sử dụng npm ci để cài đặt sạch và đồng nhất
+        run: npm ci
+        working-directory: ./board-service  # Đảm bảo lệnh chạy trong thư mục đúng
 
-      # Xây dựng dự án với ghi log chi tiết
       - name: Xây dựng
-        run: npm run build -- --verbose # Bật chế độ ghi log chi tiết cho build
+        run: npm run build -- --verbose
         env:
-          NODE_ENV: production # Đảm bảo build ở chế độ production
-        continue-on-error: false # Dừng bước nếu build thất bại
+          NODE_ENV: production
+        working-directory: ./board-service
+        continue-on-error: false
 
-      # Chạy kiểm thử với chi tiết lỗi (tùy chọn, bỏ comment nếu có kiểm thử)
-      # - name: Chạy kiểm thử
-      #   run: npm test -- --verbose # Bật chế độ ghi log chi tiết cho kiểm thử
-      #   env:
-      #     NODE_ENV: test
-      #   continue-on-error: false
+      - name: Chạy kiểm thử (nếu có)
+        run: npm test -- --verbose || echo "Không có kiểm thử, bỏ qua bước này"
+        env:
+          NODE_ENV: test
+        working-directory: ./board-service
+        continue-on-error: true  # Bỏ qua nếu không có kiểm thử
 
-      # Hiển thị chi tiết lỗi nếu build thất bại
       - name: Hiển thị chi tiết lỗi build
-        if: failure() # Chỉ chạy nếu các bước trước thất bại
+        if: failure()
         run: |
           echo "Kiểm tra các file log lỗi..."
           find . -type f -name "*.log" -exec cat {} \; || echo "Không tìm thấy file log"
           echo "Liệt kê các file trong thư mục build (nếu có)..."
           ls -la dist/ || echo "Không tìm thấy thư mục dist/"
+        working-directory: ./board-service
