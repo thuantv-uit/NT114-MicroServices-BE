@@ -15,8 +15,8 @@ jobs:
     strategy:
       matrix:
         service: [board-service, card-service, column-service, notification-service, user-service]
-        node-version: [18.x, 20.x, 22.x]  # Thêm node-version vào matrix
-      fail-fast: false  # Tiếp tục chạy các service khác nếu một service thất bại
+        node-version: [20.x, 22.x] 
+      fail-fast: false
 
     steps:
       - name: Lấy mã nguồn
@@ -25,9 +25,9 @@ jobs:
       - name: Thiết lập Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}  # Sử dụng node-version từ matrix
+          node-version: ${{ matrix.node-version }}
           cache: 'npm'
-          cache-dependency-path: ${{ matrix.service }}/package-lock.json  # Cache riêng cho từng service
+          cache-dependency-path: ${{ matrix.service }}/package-lock.json
 
       - name: Cài đặt dependencies cho ${{ matrix.service }}
         run: npm ci
