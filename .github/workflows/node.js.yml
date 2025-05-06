@@ -24,7 +24,7 @@ jobs:
       - name: Thiết lập Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18.x'  # Bạn có thể chọn phiên bản Node.js mặc định
+          node-version: '18.x, 20.x, 22.x'
           cache: 'npm'
           cache-dependency-path: ${{ matrix.service }}/package-lock.json  # Cache riêng cho từng service
 
