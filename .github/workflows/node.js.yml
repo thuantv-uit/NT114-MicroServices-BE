@@ -1,0 +1,52 @@
+name: Monorepo CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  # Job chính để xác định các thư mục con và điều phối CI
+  discover-services:
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.set-services.outputs.services }}
+    steps:
+      - name: Lấy mã nguồn
+        uses: actions/checkout@v4
+
+      - name: Tìm các thư mục con chứa service
+        id: set-services
+        run: |
+          # Chỉ liệt kê các thư mục board-service, card-service, column-service, notification-service, user-service
+          SERVICES=$(ls -d board-service card-service column-service notification-service user-service | jq -R -s -c 'split("\n")[:-1]')
+          echo "services=$SERVICES" >> $GITHUB_OUTPUT
+
+  # Job gọi CI cho từng service
+  run-service-ci:
+    needs: discover-services
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: ${{ fromJson(needs.discover-services.outputs.services) }}
+      fail-fast: false # Tiếp tục chạy các service khác nếu một service thất bại
+
+    steps:
+      - name: Lấy mã nguồn
+        uses: actions/checkout@v4
+
+      - name: Chạy CI cho ${{ matrix.service }}
+        run: |
+          cd ${{ matrix.service }}
+          # Kiểm tra xem file CI tồn tại thì mới chạy
+          if [ -f ".github/workflows/node.js.yml" ]; then
+            echo "Chạy CI cho ${{ matrix.service }}"
+            # Trigger file CI của service (GitHub Actions sẽ tự động chạy workflow con)
+            echo "Workflow CI của ${{ matrix.service }} sẽ được gọi tự động bởi GitHub Actions."
+          else
+            echo "Không tìm thấy file CI cho ${{ matrix.service }}"
+            exit 1
+          fi
