@@ -1,0 +1,73 @@
+name: Pipeline Quét Bảo mật Trivy
+
+# Kích hoạt pipeline khi push vào nhánh main
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-scan:
+    name: Xây dựng và Quét Hình ảnh Docker với Trivy
+    runs-on: ubuntu-latest
+
+    steps:
+      # Bước 1: Sao chép mã nguồn từ kho lưu trữ
+      - name: Sao chép kho lưu trữ
+        uses: actions/checkout@v3
+
+      # Bước 2: Thiết lập ngày và giờ để đặt tên tệp
+      - name: Thiết lập ngày và giờ
+        id: set-datetime
+        run: echo "DATETIME=$(date +%Y%m%d-%H%M%S)" >> $GITHUB_ENV
+
+      # Bước 3: Xây dựng hình ảnh Docker từ Dockerfile
+      - name: Xây dựng hình ảnh Docker
+        run: |
+          docker build -t my-app:${{ env.DATETIME }} -f Dockerfile .
+        env:
+          DOCKER_BUILDKIT: 1  # Kích hoạt BuildKit để xây dựng nhanh hơn
+
+      # Bước 4: Tạo thư mục lưu kết quả
+      - name: Tạo thư mục lưu kết quả
+        run: mkdir -p trivy-results
+
+      # Bước 5: Cài đặt Trivy
+      - name: Cài đặt Trivy
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sudo sh -s -- -b /usr/local/bin latest
+
+      # Bước 6: Tải cơ sở dữ liệu lỗ hổng của Trivy
+      - name: Tải cơ sở dữ liệu lỗ hổng
+        run: trivy image --download-db-only
+
+      # Bước 7: Quét hình ảnh Docker với Trivy
+      - name: Quét hình ảnh với Trivy
+        run: |
+          OUTPUT_FILE="trivy-results/scan-results-${DATETIME}.json"
+          trivy image --format json --ignore-unfixed --vuln-type os,library --severity CRITICAL,HIGH,MEDIUM,LOW -o "$OUTPUT_FILE" my-app:${DATETIME}
+
+      # Bước 8: Kiểm tra tệp kết quả quét
+      - name: Kiểm tra tệp kết quả
+        run: |
+          OUTPUT_FILE="trivy-results/scan-results-${DATETIME}.json"
+          if [ -f "$OUTPUT_FILE" ]; then
+            ls -l trivy-results/
+          else
+            echo "Lỗi: Tệp kết quả quét không được tìm thấy!"
+            exit 1
+          fi
+
+      # Bước 9: Đẩy kết quả quét vào kho lưu trữ
+      - name: Đẩy kết quả quét vào kho
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          OUTPUT_FILE="trivy-results/scan-results-${DATETIME}.json"
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add "$OUTPUT_FILE"
+          git commit -m "Thêm kết quả quét Trivy (${DATETIME})"
+          git push origin HEAD:main
