@@ -4,13 +4,14 @@ on:
   push:
     branches:
       - main
+      - feature
   pull_request:
     branches:
       - main
 
 jobs:
   build-board-service:
-    uses: ./board-service.yml
+    uses: ./board-service.yml@main
 
   build-card-service:
     uses: ./.github/workflows/card-service.yml
