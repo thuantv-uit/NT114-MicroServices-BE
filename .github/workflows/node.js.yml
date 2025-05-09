@@ -1,17 +1,16 @@
-name: MicroService CI
+name: Monorepo CI
 
 on:
   push:
     branches:
       - main
-      - feature
   pull_request:
     branches:
       - main
 
 jobs:
   build-board-service:
-    uses: ./.github/workflows/board-service.yml@main
+    uses: ./.github/workflows/board-service.yml
 
   build-card-service:
     uses: ./.github/workflows/card-service.yml
