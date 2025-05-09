@@ -23,3 +23,6 @@ jobs:
 
   build-user-service:
     uses: ./.github/workflows/user-service.yml
+
+  sonarqube:
+    uses: ./.github/workflows/sonarqube.yml
