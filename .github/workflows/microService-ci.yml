@@ -1,4 +1,4 @@
-name: MicroService CI
+name: Monorepo CI
 
 on:
   push:
