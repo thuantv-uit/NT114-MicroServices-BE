@@ -10,7 +10,7 @@ on:
 
 jobs:
   build-board-service:
-    uses: ./.github/workflows/board-service.yml
+    uses: ./board-service.yml
 
   build-card-service:
     uses: ./.github/workflows/card-service.yml
