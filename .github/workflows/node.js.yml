@@ -11,7 +11,7 @@ on:
 
 jobs:
   build-board-service:
-    uses: ./board-service.yml@main
+    uses: ./.github/workflows/board-service.yml@main
 
   build-card-service:
     uses: ./.github/workflows/card-service.yml
