@@ -122,3 +122,4 @@ jobs:
           git add trivy-results/*
           git commit -m "Thêm kết quả quét Trivy (${DATETIME})" || echo "Không có thay đổi để commit"
           git push origin trivy-results
+# TranVanThuan
