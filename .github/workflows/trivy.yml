@@ -1,0 +1,81 @@
+name: Pipeline Quét Bảo mật Trivy
+
+# Kích hoạt pipeline khi push vào nhánh main hoặc khi có pull request nhắm đến nhánh main
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-and-scan:
+    name: Xây dựng và Quét Hình ảnh Docker với Trivy
+    runs-on: ubuntu-latest
+
+    # Sử dụng matrix để chạy song song cho 5 dịch vụ
+    strategy:
+      matrix:
+        service:
+          - board-service
+          - card-service
+          - column-service
+          - notification-service
+          - user-service
+
+    steps:
+      # Bước 1: Sao chép mã nguồn từ kho lưu trữ
+      - name: Sao chép kho lưu trữ
+        uses: actions/checkout@v4
+
+      # Bước 2: Thiết lập ngày và giờ để đặt tên tệp
+      - name: Thiết lập ngày và giờ
+        id: set-datetime
+        run: echo "DATETIME=$(date +%Y%m%d-%H%M%S)" >> $GITHUB_ENV
+
+      # Bước 3: Xây dựng hình ảnh Docker từ Dockerfile của từng dịch vụ
+      - name: Xây dựng hình ảnh Docker cho ${{ matrix.service }}
+        run: |
+          docker build -t ${{ matrix.service }}:${{ env.DATETIME }} -f ${{ matrix.service }}/Dockerfile ${{ matrix.service }}
+        env:
+          DOCKER_BUILDKIT: 1  # Kích hoạt BuildKit để xây dựng nhanh hơn
+
+      # Bước 4: Tạo thư mục lưu kết quả
+      - name: Tạo thư mục lưu kết quả
+        run: mkdir -p trivy-results
+
+      # Bước 5: Cài đặt Trivy
+      - name: Cài đặt Trivy
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sudo sh -s -- -b /usr/local/bin latest
+
+      # Bước 6: Tải cơ sở dữ liệu lỗ hổng của Trivy
+      - name: Tải cơ sở dữ liệu lỗ hổng
+        run: trivy image --download-db-only
+
+      # Bước 7: Quét hình ảnh Docker với Trivy
+      - name: Quét hình ảnh ${{ matrix.service }} với Trivy
+        run: |
+          OUTPUT_FILE="trivy-results/scan-results-${{ matrix.service }}-${DATETIME}.json"
+          trivy image --format json --ignore-unfixed --vuln-type os,library --severity CRITICAL,HIGH,MEDIUM,LOW -o "$OUTPUT_FILE" ${{ matrix.service }}:${DATETIME}
+
+      # Bước 8: Kiểm tra tệp kết quả quét
+      - name: Kiểm tra tệp kết quả quét cho ${{ matrix.service }}
+        run: |
+          OUTPUT_FILE="trivy-results/scan-results-${{ matrix.service }}-${DATETIME}.json"
+          if [ -f "$OUTPUT_FILE" ]; then
+            ls -l trivy-results/
+          else
+            echo "Lỗi: Tệp kết quả quét không được tìm thấy!"
+            exit 1
+          fi
+
+      # Bước 9: Lưu kết quả quét dưới dạng artifact
+      - name: Lưu kết quả quét dưới dạng artifact cho ${{ matrix.service }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-scan-results-${{ matrix.service }}-${{ env.DATETIME }}
+          path: trivy-results/scan-results-${{ matrix.service }}-${{ env.DATETIME }}.json
