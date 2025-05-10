@@ -1,4 +1,4 @@
-name: Pipeline Quét Bảo mật Trivy
+name: Scan Pipeline
 
 # Kích hoạt pipeline khi push vào nhánh main hoặc khi có pull request nhắm đến nhánh main
 on:
@@ -105,7 +105,7 @@ jobs:
       # Bước 4: Đẩy kết quả quét vào nhánh trivy-results
       - name: Đẩy kết quả quét vào nhánh trivy-results
         env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
