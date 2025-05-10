@@ -112,8 +112,8 @@ jobs:
           git fetch origin
           git checkout -B trivy-results origin/trivy-results || git checkout -b trivy-results
           mkdir -p trivy-results
-          # Xóa tất cả file cũ trong thư mục trivy-results
-          rm -rf trivy-results/*
+          # # Xóa tất cả file cũ trong thư mục trivy-results
+          # rm -rf trivy-results/*
           # Di chuyển các file kết quả từ thư mục tải về
           for service in board-service card-service column-service notification-service user-service; do
             ARTIFACT_PATH="trivy-results/trivy-scan-results-${service}-${DATETIME}"
