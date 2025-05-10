@@ -105,13 +105,15 @@ jobs:
       # Bước 4: Đẩy kết quả quét vào nhánh trivy-results
       - name: Đẩy kết quả quét vào nhánh trivy-results
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
           git fetch origin
           git checkout -B trivy-results origin/trivy-results || git checkout -b trivy-results
           mkdir -p trivy-results
+          # Xóa tất cả file cũ trong thư mục trivy-results
+          rm -rf trivy-results/*
           # Di chuyển các file kết quả từ thư mục tải về
           for service in board-service card-service column-service notification-service user-service; do
             ARTIFACT_PATH="trivy-results/trivy-scan-results-${service}-${DATETIME}"
@@ -120,6 +122,5 @@ jobs:
             fi
           done
           git add trivy-results/*
-          git commit -m "Thêm kết quả quét Trivy (${DATETIME})" || echo "Không có thay đổi để commit"
+          git commit -m "Thêm kết quả quét Trivy mới (${DATETIME})" || echo "Không có thay đổi để commit"
           git push origin trivy-results
-# TranVanThuan
