@@ -1,0 +1,86 @@
+# column.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: column
+  namespace: nt114
+  labels:
+    app: column
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: column
+  template:
+    metadata:
+      labels:
+        app: column
+    spec:
+      containers:
+      - name: column
+        image: thuan410/nt114-be-column:v2  # Cập nhật image
+        ports:
+        - containerPort: 3003
+        env:
+        - name: PORT
+          valueFrom:
+            configMapKeyRef:
+              name: backend-configmap
+              key: COLUMN_PORT
+        - name: MONGO_URI
+          valueFrom:
+            secretKeyRef:
+              name: backend-secret
+              key: mongo-uri
+        - name: DATABASE_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: backend-configmap
+              key: DATABASE_NAME
+        - name: USER_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: backend-configmap
+              key: USER_SERVICE_URL
+        - name: BOARD_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: backend-configmap
+              key: BOARD_SERVICE_URL
+        - name: CARD_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: backend-configmap
+              key: CARD_SERVICE_URL
+        - name: INVITATION_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: backend-configmap
+              key: INVITATION_SERVICE_URL
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: backend-secret
+              key: jwt-secret
+        resources:
+          limits:
+            cpu: "800m"
+            memory: "512Mi"
+          requests:
+            cpu: "200m"
+            memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: column-service
+  namespace: nt114
+spec:
+  selector:
+    app: column
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 3003
+    nodePort: 30003
+  type: NodePort
