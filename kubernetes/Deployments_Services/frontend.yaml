@@ -1,0 +1,71 @@
+# frontend.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: nt114
+  labels:
+    app: frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+      - name: frontend
+        image: thuan410/nt114-frontend:v2
+        ports:
+        - containerPort: 3000
+        env:
+        - name: REACT_APP_USER_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: frontend-configmap
+              key: REACT_APP_USER_SERVICE_URL
+        - name: REACT_APP_BOARD_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: frontend-configmap
+              key: REACT_APP_BOARD_SERVICE_URL
+        - name: REACT_APP_COLUMN_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: frontend-configmap
+              key: REACT_APP_COLUMN_SERVICE_URL
+        - name: REACT_APP_CARD_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: frontend-configmap
+              key: REACT_APP_CARD_SERVICE_URL
+        - name: REACT_APP_INVITATION_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: frontend-configmap
+              key: REACT_APP_INVITATION_SERVICE_URL
+        resources:
+          limits:
+            cpu: "1000m"  # Tăng từ 500m lên 1000m (1 CPU core)
+            memory: "1024Mi"  # Tăng từ 512Mi lên 1024Mi (1 GiB)
+          requests:
+            cpu: "500m"  # Tăng từ 200m lên 500m (0.5 CPU core)
+            memory: "512Mi"  # Tăng từ 256Mi lên 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+  namespace: nt114
+spec:
+  selector:
+    app: frontend
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 3000
+    nodePort: 30000
+  type: NodePort

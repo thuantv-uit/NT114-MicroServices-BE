@@ -1,0 +1,86 @@
+# card.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: card
+  namespace: nt114
+  labels:
+    app: card
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: card
+  template:
+    metadata:
+      labels:
+        app: card
+    spec:
+      containers:
+      - name: card
+        image: thuan410/nt114-be-card:v2  # Cập nhật image
+        ports:
+        - containerPort: 3004
+        env:
+        - name: PORT
+          valueFrom:
+            configMapKeyRef:
+              name: backend-configmap
+              key: CARD_PORT
+        - name: MONGO_URI
+          valueFrom:
+            secretKeyRef:
+              name: backend-secret
+              key: mongo-uri
+        - name: DATABASE_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: backend-configmap
+              key: DATABASE_NAME
+        - name: USER_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: backend-configmap
+              key: USER_SERVICE_URL
+        - name: BOARD_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: backend-configmap
+              key: BOARD_SERVICE_URL
+        - name: COLUMN_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: backend-configmap
+              key: COLUMN_SERVICE_URL
+        - name: INVITATION_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: backend-configmap
+              key: INVITATION_SERVICE_URL
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: backend-secret
+              key: jwt-secret
+        resources:
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+          requests:
+            cpu: "200m"
+            memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: card-service
+  namespace: nt114
+spec:
+  selector:
+    app: card
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 3004
+    nodePort: 30004
+  type: NodePort

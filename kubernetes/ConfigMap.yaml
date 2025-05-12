@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-configmap
+  namespace: nt114
+data:
+  REACT_APP_USER_SERVICE_URL: "http://192.168.88.31:30001/api/users"
+  REACT_APP_BOARD_SERVICE_URL: "http://192.168.88.31:30002/api/boards"
+  REACT_APP_COLUMN_SERVICE_URL: "http://192.168.88.31:30003/api/columns"
+  REACT_APP_CARD_SERVICE_URL: "http://192.168.88.31:30004/api/cards"
+  REACT_APP_INVITATION_SERVICE_URL: "http://192.168.88.31:30005/api/invitations"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-configmap
+  namespace: nt114
+data:
+  USER_PORT: "3001"
+  BOARD_PORT: "3002"
+  COLUMN_PORT: "3003"
+  CARD_PORT: "3004"
+  INVITATION_PORT: "3005"
+  DATABASE_NAME: "NT114"
+  USER_SERVICE_URL: "http://192.168.88.31:30001"
+  BOARD_SERVICE_URL: "http://192.168.88.31:30002"
+  COLUMN_SERVICE_URL: "http://192.168.88.31:30003"
+  CARD_SERVICE_URL: "http://192.168.88.31:30004"
+  INVITATION_SERVICE_URL: "http://192.168.88.31:30005"
