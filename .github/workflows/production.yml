@@ -1,4 +1,4 @@
-name: MicroService CI
+name: MicroService CI - Production
 
 on:
   push:
@@ -10,16 +10,16 @@ on:
 
 jobs:
   build-board-service:
-    uses: ./.github/workflows/production/board-service.yml
+    uses: ./.github/workflows/production-board-service.yml
 
   build-card-service:
-    uses: ./.github/workflows/production/card-service.yml
+    uses: ./.github/workflows/production-card-service.yml
 
   build-column-service:
-    uses: ./.github/workflows/production/column-service.yml
+    uses: ./.github/workflows/production-column-service.yml
 
   build-notification-service:
-    uses: ./.github/workflows/production/notification-service.yml
+    uses: ./.github/workflows/production-notification-service.yml
 
   build-user-service:
-    uses: ./.github/workflows/production/user-service.yml
+    uses: ./.github/workflows/production-user-service.yml
