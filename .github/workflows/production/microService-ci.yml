@@ -1,0 +1,25 @@
+name: MicroService CI
+
+on:
+  push:
+    branches:
+      - production
+  pull_request:
+    branches:
+      - production
+
+jobs:
+  build-board-service:
+    uses: ./.github/workflows/production/board-service.yml
+
+  build-card-service:
+    uses: ./.github/workflows/production/card-service.yml
+
+  build-column-service:
+    uses: ./.github/workflows/production/column-service.yml
+
+  build-notification-service:
+    uses: ./.github/workflows/production/notification-service.yml
+
+  build-user-service:
+    uses: ./.github/workflows/production/user-service.yml

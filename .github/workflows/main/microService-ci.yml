@@ -1,0 +1,25 @@
+name: MicroService CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-board-service:
+    uses: ./.github/workflows/main/board-service.yml
+
+  build-card-service:
+    uses: ./.github/workflows/main/card-service.yml
+
+  build-column-service:
+    uses: ./.github/workflows/main/column-service.yml
+
+  build-notification-service:
+    uses: ./.github/workflows/main/notification-service.yml
+
+  build-user-service:
+    uses: ./.github/workflows/main/user-service.yml
