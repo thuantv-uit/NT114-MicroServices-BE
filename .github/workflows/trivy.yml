@@ -2,13 +2,7 @@ name: Scan Pipeline
 
 # Kích hoạt pipeline khi push vào nhánh main hoặc khi có pull request nhắm đến nhánh main
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
-
+  workflow_call:  # Thay đổi để có thể gọi từ ci.yml
 jobs:
   build-and-scan:
     name: Xây dựng và Quét Hình ảnh Docker với Trivy
