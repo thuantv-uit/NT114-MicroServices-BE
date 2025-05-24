@@ -1,39 +1,46 @@
-name: MicroService CI - Main
+name: MicroService CI
 
 on:
   push:
     branches:
       - main
+      - production
   pull_request:
     branches:
       - main
+      - production
 
 jobs:
   build-board-service:
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/production'
     uses: ./.github/workflows/build-service.yml
     with:
       service-name: board-service
       package-lock-path: board-service/package-lock.json
 
   build-card-service:
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/production'
     uses: ./.github/workflows/build-service.yml
     with:
       service-name: card-service
       package-lock-path: card-service/package-lock.json
 
   build-column-service:
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/production'
     uses: ./.github/workflows/build-service.yml
     with:
       service-name: column-service
       package-lock-path: column-service/package-lock.json
 
   build-notification-service:
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/production'
     uses: ./.github/workflows/build-service.yml
     with:
       service-name: notification-service
       package-lock-path: notification-service/package-lock.json
 
   build-user-service:
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/production'
     uses: ./.github/workflows/build-service.yml
     with:
       service-name: user-service
