@@ -1,7 +1,16 @@
-name: Card Service CI
+name: Build Service CI
 
 on:
   workflow_call:
+    inputs:
+      service-name:
+        description: 'Tên thư mục của dịch vụ (e.g., user-service, board-service)'
+        required: true
+        type: string
+      package-lock-path:
+        description: 'Đường dẫn đến file package-lock.json (e.g., user-service/package-lock.json)'
+        required: true
+        type: string
 
 jobs:
   build:
@@ -21,17 +30,17 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
-          cache-dependency-path: card-service/package-lock.json
+          cache-dependency-path: ${{ inputs.package-lock-path }}
 
       - name: Cài đặt dependencies
         run: npm ci
-        working-directory: ./card-service
+        working-directory: ./${{ inputs.service-name }}
 
       - name: Xây dựng
         run: npm run build -- --verbose
         env:
           NODE_ENV: production
-        working-directory: ./card-service
+        working-directory: ./${{ inputs.service-name }}
         continue-on-error: false
 
       - name: Hiển thị chi tiết lỗi nếu thất bại
@@ -41,4 +50,6 @@ jobs:
           find . -type f -name "*.log" -exec cat {} \; || echo "Không tìm thấy file log"
           echo "Liệt kê các file trong thư mục build (nếu có)..."
           ls -la dist/ || echo "Không tìm thấy thư mục dist/"
-        working-directory: ./card-service
+          echo "Hiển thị thông tin chi tiết lỗi (nếu có)..."
+          npm run build -- --stack || echo "Không thể lấy stack trace"
+        working-directory: ./${{ inputs.service-name }}

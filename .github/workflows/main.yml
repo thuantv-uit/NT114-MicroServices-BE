@@ -10,16 +10,31 @@ on:
 
 jobs:
   build-board-service:
-    uses: ./.github/workflows/main-board-service.yml
+    uses: ./.github/workflows/build-service.yml
+    with:
+      service-name: board-service
+      package-lock-path: board-service/package-lock.json
 
   build-card-service:
-    uses: ./.github/workflows/main-card-service.yml
+    uses: ./.github/workflows/build-service.yml
+    with:
+      service-name: card-service
+      package-lock-path: card-service/package-lock.json
 
   build-column-service:
-    uses: ./.github/workflows/main-column-service.yml
+    uses: ./.github/workflows/build-service.yml
+    with:
+      service-name: column-service
+      package-lock-path: column-service/package-lock.json
 
   build-notification-service:
-    uses: ./.github/workflows/main-notification-service.yml
+    uses: ./.github/workflows/build-service.yml
+    with:
+      service-name: notification-service
+      package-lock-path: notification-service/package-lock.json
 
   build-user-service:
-    uses: ./.github/workflows/main-user-service.yml
+    uses: ./.github/workflows/build-service.yml
+    with:
+      service-name: user-service
+      package-lock-path: user-service/package-lock.json
