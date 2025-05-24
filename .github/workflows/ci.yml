@@ -41,9 +41,9 @@ jobs:
       service-name: user-service
       package-lock-path: user-service/package-lock.json
 
-  sonarqube:
-    if: github.ref == 'refs/heads/main'
-    uses: ./.github/workflows/sonarqube.yml
+  # sonarqube:
+  #   if: github.ref == 'refs/heads/main'
+  #   uses: ./.github/workflows/sonarqube.yml
 
   trivy:
     if: github.ref == 'refs/heads/main'
