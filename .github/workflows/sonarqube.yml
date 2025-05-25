@@ -16,9 +16,4 @@ jobs:
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v5
         env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}  # Lấy trực tiếp từ GitHub Secrets
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}  # Lấy trực tiếp từ GitHub Secrets
-        with:
-          args: >
-            -Dsonar.projectKey=thuantv-uit_NT114_MicroServices_BE
-            -Dsonar.organization=nt114
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
