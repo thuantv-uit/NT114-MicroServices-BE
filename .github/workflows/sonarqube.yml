@@ -1,10 +1,10 @@
 name: Build
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-    types: [opened, synchronize, reopened]
+  workflow_call:  # Thay đổi để có thể gọi từ ci.yml
+    inputs:
+      SONAR_TOKEN:
+        required: true
+        type: string
 jobs:
   sonarqube:
     name: SonarQube
