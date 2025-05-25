@@ -43,8 +43,6 @@ jobs:
 
   sonarqube:
     if: github.ref == 'refs/heads/main'
-    secrets:
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     uses: ./.github/workflows/sonarqube.yml
 
   trivy:
