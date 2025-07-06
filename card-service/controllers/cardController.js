@@ -66,7 +66,7 @@ const validateColumnAndBoard = async (columnId, userId, token) => {
 
 const createCard = async (req, res, next) => {
   try {
-    const { title, description, columnId } = req.body;
+    const { title, description, columnId, process } = req.body;
     const token = extractToken(req);
     if (!isValidObjectId(columnId)) {
       throwError(ERROR_MESSAGES.INVALID_COLUMN_ID, STATUS_CODES.BAD_REQUEST);
@@ -86,7 +86,17 @@ const createCard = async (req, res, next) => {
       }
     }
 
-    const card = new Card({ title, description, columnId });
+    // Kiểm tra giá trị process nếu được gửi
+    if (process !== undefined && (typeof process !== 'number' || process < 0 || process > 100)) {
+      throwError('Giá trị process phải là số từ 0 đến 100', STATUS_CODES.BAD_REQUEST);
+    }
+
+    const card = new Card({ 
+      title, 
+      description, 
+      columnId, 
+      process: process !== undefined ? process : 0 
+    });
     await card.save();
 
     // Cập nhật cardOrderIds trong cột
