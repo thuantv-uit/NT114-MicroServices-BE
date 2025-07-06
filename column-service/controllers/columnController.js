@@ -47,6 +47,7 @@ const createColumn = async (req, res, next) => {
   }
 };
 
+// need to fix 
 const updateColumn = async (req, res, next) => {
   try {
     const { columnId } = req.params;
@@ -60,18 +61,27 @@ const updateColumn = async (req, res, next) => {
       throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
     }
     const { board } = await validateUserAndBoardAccess(column.boardId, req.user.id, token);
-    if (board.userId.toString() !== req.user.id) {
-      throwError(ERROR_MESSAGES.NOT_BOARD_OWNER, STATUS_CODES.FORBIDDEN);
+
+    // Kiểm tra quyền: chủ sở hữu bảng hoặc người được mời vào cột
+    const isBoardOwner = board.userId.toString() === req.user.id;
+    let hasColumnAccess = false;
+    if (!isBoardOwner) {
+      const columnInvitations = await checkColumnInvitation(null, columnId, req.user.id, token);
+      hasColumnAccess = columnInvitations.some(inv => inv.status === 'accepted');
+    }
+
+    if (!isBoardOwner && !hasColumnAccess) {
+      throwError(ERROR_MESSAGES.NOT_INVITED_TO_COLUMN, STATUS_CODES.FORBIDDEN);
     }
 
     // Kiểm tra cardOrderIds nếu được gửi
     if (cardOrderIds !== undefined) {
       if (!Array.isArray(cardOrderIds)) {
-        throwError('cardOrderIds must be an array', STATUS_CODES.BAD_REQUEST);
+        throwError('cardOrderIds phải là một mảng', STATUS_CODES.BAD_REQUEST);
       }
       cardOrderIds.forEach(id => {
         if (!isValidObjectId(id)) {
-          throwError(`Invalid card ID in cardOrderIds: ${id}`, STATUS_CODES.BAD_REQUEST);
+          throwError(`ID thẻ không hợp lệ trong cardOrderIds: ${id}`, STATUS_CODES.BAD_REQUEST);
         }
       });
     }

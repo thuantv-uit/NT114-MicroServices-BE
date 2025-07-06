@@ -50,25 +50,25 @@ const checkColumnInvitation = async (boardId, columnId, userId, token) => {
   }
 };
 
-const checkCardInvitation = async (cardId, userId, token) => {
-  try {
-    const url = cardId
-      ? `${INVITATION_SERVICE_URL}/api/invitations/card/${cardId}/user/${userId}`
-      : `${INVITATION_SERVICE_URL}/api/invitations/card/user/${userId}`;
-    const response = await axios.get(url, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    return response.data || [];
-  } catch (error) {
-    if (error.response?.status === 404) {
-      return [];
-    }
-    throwError(
-      `${ERROR_MESSAGES.INVITATION_SERVICE_ERROR}: ${error.message}`,
-      STATUS_CODES.INTERNAL_SERVER_ERROR
-    );
-  }
-};
+// const checkCardInvitation = async (cardId, userId, token) => {
+//   try {
+//     const url = cardId
+//       ? `${INVITATION_SERVICE_URL}/api/invitations/card/${cardId}/user/${userId}`
+//       : `${INVITATION_SERVICE_URL}/api/invitations/card/user/${userId}`;
+//     const response = await axios.get(url, {
+//       headers: { Authorization: `Bearer ${token}` },
+//     });
+//     return response.data || [];
+//   } catch (error) {
+//     if (error.response?.status === 404) {
+//       return [];
+//     }
+//     throwError(
+//       `${ERROR_MESSAGES.INVITATION_SERVICE_ERROR}: ${error.message}`,
+//       STATUS_CODES.INTERNAL_SERVER_ERROR
+//     );
+//   }
+// };
 
 const checkAllColumnsInvited = async (userId, token) => {
   try {
@@ -88,28 +88,26 @@ const checkAllColumnsInvited = async (userId, token) => {
   }
 };
 
-const checkCardsInvitedInColumn = async (columnId, userId, token) => {
-  try {
-    const url = `${INVITATION_SERVICE_URL}/api/invitations/cards/column/${columnId}/user/${userId}`;
-    const response = await axios.get(url, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    return response.data || [];
-  } catch (error) {
-    if (error.response?.status === 404) {
-      return [];
-    }
-    throwError(
-      `${ERROR_MESSAGES.INVITATION_SERVICE_ERROR}: ${error.message}`,
-      STATUS_CODES.INTERNAL_SERVER_ERROR
-    );
-  }
-};
+// const checkCardsInvitedInColumn = async (columnId, userId, token) => {
+//   try {
+//     const url = `${INVITATION_SERVICE_URL}/api/invitations/cards/column/${columnId}/user/${userId}`;
+//     const response = await axios.get(url, {
+//       headers: { Authorization: `Bearer ${token}` },
+//     });
+//     return response.data || [];
+//   } catch (error) {
+//     if (error.response?.status === 404) {
+//       return [];
+//     }
+//     throwError(
+//       `${ERROR_MESSAGES.INVITATION_SERVICE_ERROR}: ${error.message}`,
+//       STATUS_CODES.INTERNAL_SERVER_ERROR
+//     );
+//   }
+// };
 
 module.exports = {
   checkBoardInvitation,
   checkColumnInvitation,
-  checkCardInvitation,
   checkAllColumnsInvited,
-  checkCardsInvitedInColumn,
 };
