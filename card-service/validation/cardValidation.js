@@ -2,27 +2,38 @@ const Joi = require('joi');
 
 const createCardSchema = Joi.object({
   title: Joi.string().min(3).max(100).required().messages({
-    'string.min': 'Title must be at least 3 characters',
-    'string.max': 'Title must not exceed 100 characters',
-    'any.required': 'Title is required',
+    'string.min': 'Tiêu đề phải có ít nhất 3 ký tự',
+    'string.max': 'Tiêu đề không được vượt quá 100 ký tự',
+    'any.required': 'Tiêu đề là bắt buộc',
   }),
-  description: Joi.string().max(500000).optional().messages({
-    'string.max': 'Description must not exceed 500 characters',
+  description: Joi.string().max(500).optional().messages({
+    'string.max': 'Mô tả không được vượt quá 500 ký tự',
   }),
   columnId: Joi.string().length(24).hex().required().messages({
-    'string.length': 'Column ID must be 24 characters',
-    'string.hex': 'Column ID must be a hex string',
-    'any.required': 'Column ID is required',
+    'string.length': 'ID cột phải có 24 ký tự',
+    'string.hex': 'ID cột phải là chuỗi hex',
+    'any.required': 'ID cột là bắt buộc',
+  }),
+  process: Joi.number().min(0).max(100).default(0).required().messages({
+    'number.base': 'Mức độ hoàn thành phải là một số',
+    'number.min': 'Mức độ hoàn thành phải từ 0 trở lên',
+    'number.max': 'Mức độ hoàn thành không được vượt quá 100',
+    'any.required': 'Mức độ hoàn thành là bắt buộc',
   }),
 });
 
 const updateCardSchema = Joi.object({
   title: Joi.string().min(3).max(100).optional().messages({
-    'string.min': 'Title must be at least 3 characters',
-    'string.max': 'Title must not exceed 100 characters',
+    'string.min': 'Tiêu đề phải có ít nhất 3 ký tự',
+    'string.max': 'Tiêu đề không được vượt quá 100 ký tự',
   }),
   description: Joi.string().max(500).optional().messages({
-    'string.max': 'Description must not exceed 500 characters',
+    'string.max': 'Mô tả không được vượt quá 500 ký tự',
+  }),
+  process: Joi.number().min(0).max(100).optional().messages({
+    'number.base': 'Mức độ hoàn thành phải là một số',
+    'number.min': 'Mức độ hoàn thành phải từ 0 trở lên',
+    'number.max': 'Mức độ hoàn thành không được vượt quá 100',
   }),
 });
 

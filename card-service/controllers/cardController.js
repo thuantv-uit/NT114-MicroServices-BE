@@ -188,7 +188,7 @@ const deleteCard = async (req, res, next) => {
 const updateCard = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { title, description } = req.body;
+    const { title, description, process } = req.body;
     const token = extractToken(req);
     if (!isValidObjectId(id)) {
       throwError(ERROR_MESSAGES.INVALID_CARD_ID, STATUS_CODES.BAD_REQUEST);
@@ -201,8 +201,15 @@ const updateCard = async (req, res, next) => {
       throwError(ERROR_MESSAGES.INVALID_COLUMN_ID, STATUS_CODES.BAD_REQUEST);
     }
     const { column, board } = await validateColumnAndBoard(card.columnId, req.user.id, token);
+
+    // Kiểm tra giá trị process nếu được gửi
+    if (process !== undefined && (typeof process !== 'number' || process < 0 || process > 100)) {
+      throwError('Giá trị process phải là số từ 0 đến 100', STATUS_CODES.BAD_REQUEST);
+    }
+
     card.title = title !== undefined ? title : card.title;
     card.description = description !== undefined ? description : card.description;
+    card.process = process !== undefined ? process : card.process;
     card.updatedAt = Date.now();
     await card.save();
 
