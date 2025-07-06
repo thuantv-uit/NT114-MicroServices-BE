@@ -4,7 +4,6 @@ const Invitation = require('../models/invitationModel');
 const { checkUserExists, checkUserExistsByEmail } = require('../services/user');
 const { getBoardById } = require('../services/board');
 const { getColumnById } = require('../services/column');
-const { getCardById } = require('../services/card');
 const { extractToken, throwError, isValidObjectId } = require('../utils/helpers');
 const { STATUS_CODES, ERROR_MESSAGES } = require('../utils/constants');
 
@@ -22,14 +21,19 @@ const authMiddleware = (req, res, next) => {
   }
 };
 
-const validateInvitation = async (type, boardId, columnId, cardId, userId, invitedUserId, token) => {
+const validateInvitation = async (type, boardId, columnId, userId, invitedUserId, token) => {
+  // Validate ObjectIDs
   if (!isValidObjectId(boardId) || !isValidObjectId(userId) || !isValidObjectId(invitedUserId)) {
     throwError(ERROR_MESSAGES.INVALID_ID, STATUS_CODES.BAD_REQUEST);
   }
+
+  // Check if invited user exists
   const invitedUser = await checkUserExists(invitedUserId, token);
   if (!invitedUser) {
     throwError(`${ERROR_MESSAGES.USER_NOT_FOUND}: ${invitedUserId}`, STATUS_CODES.NOT_FOUND);
   }
+
+  // Verify board existence and ownership
   let board;
   try {
     board = await getBoardById(boardId, userId, token);
@@ -42,7 +46,9 @@ const validateInvitation = async (type, boardId, columnId, cardId, userId, invit
   if (board.userId.toString() !== userId) {
     throwError(ERROR_MESSAGES.NOT_BOARD_OWNER, STATUS_CODES.FORBIDDEN);
   }
-  if (type !== 'board') {
+
+  // For non-board invitations, ensure the invited user has accepted a board invitation
+  if (type === 'column') {
     const boardInvitation = await Invitation.findOne({
       type: 'board',
       boardId,
@@ -55,8 +61,8 @@ const validateInvitation = async (type, boardId, columnId, cardId, userId, invit
         STATUS_CODES.FORBIDDEN
       );
     }
-  }
-  if (type === 'column' || type === 'card') {
+
+    // Validate column
     if (!isValidObjectId(columnId)) {
       throwError(ERROR_MESSAGES.INVALID_COLUMN_ID, STATUS_CODES.BAD_REQUEST);
     }
@@ -64,73 +70,15 @@ const validateInvitation = async (type, boardId, columnId, cardId, userId, invit
     try {
       column = await getColumnById(columnId, userId, token);
     } catch (error) {
-      if (error.statusCode === STATUS_CODES.FORBIDDEN) {
-        try {
-          const response = await axios.get(`${COLUMN_SERVICE_URL}/api/columns/${columnId}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          column = response.data;
-        } catch (err) {
-          throwError(
-            `${ERROR_MESSAGES.NOT_FOUND_COLUMN}: columnId ${columnId} not accessible`,
-            STATUS_CODES.NOT_FOUND
-          );
-        }
-      } else {
-        throw error;
-      }
+      throwError(
+        `${ERROR_MESSAGES.NOT_FOUND_COLUMN}: columnId ${columnId} not accessible`,
+        STATUS_CODES.NOT_FOUND
+      );
     }
     if (!column || column.boardId.toString() !== boardId.toString()) {
       throwError(
         `${ERROR_MESSAGES.NOT_FOUND_COLUMN}: columnId ${columnId} does not exist or does not belong to board ${boardId}`,
         STATUS_CODES.NOT_FOUND
-      );
-    }
-  }
-  if (type === 'card') {
-    if (!isValidObjectId(cardId)) {
-      throwError(ERROR_MESSAGES.INVALID_CARD_ID, STATUS_CODES.BAD_REQUEST);
-    }
-    let card;
-    try {
-      card = await getCardById(cardId, userId, token);
-    } catch (error) {
-      if (error.statusCode === STATUS_CODES.FORBIDDEN) {
-        try {
-          const response = await axios.get(`${CARD_SERVICE_URL}/api/cards/${cardId}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          card = response.data;
-        } catch (err) {
-          throwError(
-            `${ERROR_MESSAGES.CARD_NOT_FOUND}: cardId ${cardId} not accessible`,
-            STATUS_CODES.NOT_FOUND
-          );
-        }
-      } else {
-        throw error;
-      }
-    }
-    if (!card) {
-      throwError(`${ERROR_MESSAGES.CARD_NOT_FOUND}: cardId ${cardId} does not exist`, STATUS_CODES.NOT_FOUND);
-    }
-    if (card.columnId.toString() !== columnId.toString()) {
-      throwError(
-        `${ERROR_MESSAGES.CARD_NOT_FOUND}: cardId ${cardId} does not belong to column ${columnId}`,
-        STATUS_CODES.NOT_FOUND
-      );
-    }
-    const columnInvitation = await Invitation.findOne({
-      type: 'column',
-      boardId,
-      columnId,
-      userId: invitedUserId,
-      status: 'accepted',
-    });
-    if (!columnInvitation) {
-      throwError(
-        `${ERROR_MESSAGES.NOT_INVITED_TO_COLUMN}: user ${invitedUser.email} (ID: ${invitedUserId}) must be invited to column ${columnId}`,
-        STATUS_CODES.FORBIDDEN
       );
     }
   }
@@ -144,7 +92,7 @@ const inviteToBoard = async (req, res, next) => {
     if (!invitedUser) {
       throwError(ERROR_MESSAGES.USER_NOT_FOUND, STATUS_CODES.NOT_FOUND);
     }
-    await validateInvitation('board', boardId, null, null, req.user.id, invitedUser._id, token);
+    await validateInvitation('board', boardId, null, req.user.id, invitedUser._id, token);
     const existingInvitation = await Invitation.findOne({
       type: 'board',
       boardId,
@@ -175,7 +123,7 @@ const inviteToColumn = async (req, res, next) => {
     if (!invitedUser) {
       throwError(ERROR_MESSAGES.USER_NOT_FOUND, STATUS_CODES.NOT_FOUND);
     }
-    await validateInvitation('column', boardId, columnId, null, req.user.id, invitedUser._id, token);
+    await validateInvitation('column', boardId, columnId, req.user.id, invitedUser._id, token);
     const existingInvitation = await Invitation.findOne({
       type: 'column',
       boardId,
@@ -190,41 +138,6 @@ const inviteToColumn = async (req, res, next) => {
       type: 'column',
       boardId,
       columnId,
-      userId: invitedUser._id,
-      invitedBy: req.user.id,
-    });
-    await invitation.save();
-    res.status(STATUS_CODES.CREATED).json({ message: ERROR_MESSAGES.INVITATION_SENT, invitation });
-  } catch (error) {
-    next(error);
-  }
-};
-
-const assignToCard = async (req, res, next) => {
-  try {
-    const { boardId, columnId, cardId, email } = req.body;
-    const token = extractToken(req);
-    const invitedUser = await checkUserExistsByEmail(email, token);
-    if (!invitedUser) {
-      throwError(ERROR_MESSAGES.USER_NOT_FOUND, STATUS_CODES.NOT_FOUND);
-    }
-    await validateInvitation('card', boardId, columnId, cardId, req.user.id, invitedUser._id, token);
-    const existingInvitation = await Invitation.findOne({
-      type: 'card',
-      boardId,
-      columnId,
-      cardId,
-      userId: invitedUser._id,
-      status: 'pending',
-    });
-    if (existingInvitation) {
-      throwError(ERROR_MESSAGES.ALREADY_INVITED, STATUS_CODES.BAD_REQUEST);
-    }
-    const invitation = new Invitation({
-      type: 'card',
-      boardId,
-      columnId,
-      cardId,
       userId: invitedUser._id,
       invitedBy: req.user.id,
     });
@@ -254,7 +167,12 @@ const acceptInvitation = async (req, res, next) => {
     }
     invitation.status = 'accepted';
     await invitation.save();
-    res.json({ message: ERROR_MESSAGES.INVITATION_ACCEPTED, invitation });
+    res.json({ 
+      message: invitation.type === 'board' 
+        ? 'Board invitation accepted. You need a column invitation to view or edit content.' 
+        : 'Column invitation accepted. You can now view and edit cards in this column.', 
+      invitation 
+    });
   } catch (error) {
     next(error);
   }
@@ -335,67 +253,18 @@ const getColumnInvitations = async (req, res, next) => {
   }
 };
 
-const getCardInvitations = async (req, res, next) => {
-  try {
-    const { cardId, userId } = req.params;
-    const token = extractToken(req);
-    if (cardId && !isValidObjectId(cardId)) {
-      throwError(ERROR_MESSAGES.INVALID_CARD_ID, STATUS_CODES.BAD_REQUEST);
-    }
-    if (!isValidObjectId(userId)) {
-      throwError(ERROR_MESSAGES.INVALID_ID, STATUS_CODES.BAD_REQUEST);
-    }
-    const query = { userId, type: 'card', status: 'accepted' };
-    if (cardId) query.cardId = cardId;
-    const invitations = await Invitation.find(query);
-    if (cardId && !invitations.length) {
-      throwError(ERROR_MESSAGES.INVITATION_NOT_FOUND, STATUS_CODES.NOT_FOUND);
-    }
-    res.json(invitations);
-  } catch (error) {
-    next(error);
-  }
-};
-
 const getAllColumnsInvited = async (req, res, next) => {
   try {
     const { userId } = req.params;
     const token = extractToken(req);
-    
     if (!isValidObjectId(userId)) {
       throwError(ERROR_MESSAGES.INVALID_ID, STATUS_CODES.BAD_REQUEST);
     }
-    
     const invitations = await Invitation.find({
       userId,
       type: 'column',
+      status: 'accepted',
     }).select('boardId columnId status createdAt updatedAt');
-    
-    res.json(invitations);
-  } catch (error) {
-    next(error);
-  }
-};
-
-const getCardsInvitedInColumn = async (req, res, next) => {
-  try {
-    const { columnId, userId } = req.params;
-    const token = extractToken(req);
-    
-    if (!isValidObjectId(columnId) || !isValidObjectId(userId)) {
-      throwError(ERROR_MESSAGES.INVALID_ID, STATUS_CODES.BAD_REQUEST);
-    }
-    
-    const invitations = await Invitation.find({
-      userId,
-      type: 'card',
-      columnId,
-    }).select('boardId columnId cardId status createdAt updatedAt');
-    
-    if (!invitations.length) {
-      throwError(ERROR_MESSAGES.INVITATION_NOT_FOUND, STATUS_CODES.NOT_FOUND);
-    }
-    
     res.json(invitations);
   } catch (error) {
     next(error);
@@ -438,37 +307,15 @@ const getPendingColumnInvitations = async (req, res, next) => {
   }
 };
 
-const getPendingCardInvitations = async (req, res, next) => {
-  try {
-    const { userId } = req.params;
-    const token = extractToken(req);
-    if (!isValidObjectId(userId)) {
-      throwError(ERROR_MESSAGES.INVALID_ID, STATUS_CODES.BAD_REQUEST);
-    }
-    const invitations = await Invitation.find({
-      userId,
-      type: 'card',
-      status: 'pending',
-    });
-    res.json(invitations);
-  } catch (error) {
-    next(error);
-  }
-};
-
 module.exports = {
   authMiddleware,
   inviteToBoard,
   inviteToColumn,
-  assignToCard,
   acceptInvitation,
   rejectInvitation,
   getBoardInvitations,
   getColumnInvitations,
-  getCardInvitations,
   getAllColumnsInvited,
-  getCardsInvitedInColumn,
   getPendingBoardInvitations,
   getPendingColumnInvitations,
-  getPendingCardInvitations
 };
