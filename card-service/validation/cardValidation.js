@@ -14,11 +14,10 @@ const createCardSchema = Joi.object({
     'string.hex': 'ID cột phải là chuỗi hex',
     'any.required': 'ID cột là bắt buộc',
   }),
-  process: Joi.number().min(0).max(100).default(0).required().messages({
+  process: Joi.number().min(0).max(100).default(0).messages({
     'number.base': 'Mức độ hoàn thành phải là một số',
     'number.min': 'Mức độ hoàn thành phải từ 0 trở lên',
     'number.max': 'Mức độ hoàn thành không được vượt quá 100',
-    'any.required': 'Mức độ hoàn thành là bắt buộc',
   }),
 });
 
