@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const Card = require('../models/cardModel');
 const { getColumnById, updateColumnCardOrder } = require('../services/column');
 const { getBoardById } = require('../services/board');
-const { checkCardInvitation, checkColumnInvitation, checkBoardInvitation, checkCardsInvitedInColumn } = require('../services/invitation');
+const { checkColumnInvitation } = require('../services/invitation');
 const { extractToken, throwError, isValidObjectId } = require('../utils/helpers');
 const { STATUS_CODES, ERROR_MESSAGES } = require('../utils/constants');
 const { validateUserAndBoardAccess } = require('../utils/permissions');
@@ -54,10 +54,10 @@ const validateColumnAndBoard = async (columnId, userId, token) => {
       throw error;
     }
   }
-  // Chỉ kiểm tra lời mời column nếu không phải board owner
+  // Chỉ kiểm tra lời mời cột nếu không phải chủ sở hữu bảng
   if (board.userId.toString() !== userId) {
-    const columnInvitation = await checkColumnInvitation(null, columnId, userId, token);
-    if (!columnInvitation.length) {
+    const columnInvitations = await checkColumnInvitation(null, columnId, userId, token);
+    if (!columnInvitations.some(inv => inv.status === 'accepted')) {
       throwError(ERROR_MESSAGES.NOT_INVITED_TO_COLUMN, STATUS_CODES.FORBIDDEN);
     }
   }
@@ -71,17 +71,17 @@ const createCard = async (req, res, next) => {
     if (!isValidObjectId(columnId)) {
       throwError(ERROR_MESSAGES.INVALID_COLUMN_ID, STATUS_CODES.BAD_REQUEST);
     }
-    // Kiểm tra column có tồn tại không
+    // Kiểm tra cột có tồn tại không
     const column = await getColumnById(columnId, req.user.id, token);
     if (!column) {
       throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
     }
     const { board } = await validateUserAndBoardAccess(column.boardId, req.user.id, token);
     
-    // Kiểm tra quyền: board owner hoặc người được mời vào column
+    // Kiểm tra quyền: chủ sở hữu bảng hoặc người được mời vào cột
     if (board.userId.toString() !== req.user.id) {
-      const columnInvitation = await checkColumnInvitation(null, columnId, req.user.id, token);
-      if (!columnInvitation.length) {
+      const columnInvitations = await checkColumnInvitation(null, columnId, req.user.id, token);
+      if (!columnInvitations.some(inv => inv.status === 'accepted')) {
         throwError(ERROR_MESSAGES.NOT_INVITED_TO_COLUMN, STATUS_CODES.FORBIDDEN);
       }
     }
@@ -89,7 +89,7 @@ const createCard = async (req, res, next) => {
     const card = new Card({ title, description, columnId });
     await card.save();
 
-    // Cập nhật cardOrderIds trong column
+    // Cập nhật cardOrderIds trong cột
     const newCardOrderIds = [...(column.cardOrderIds || []), card._id.toString()];
     await updateColumnCardOrder(columnId, newCardOrderIds, token);
 
@@ -112,18 +112,21 @@ const getCardsByColumn = async (req, res, next) => {
     }
     const { board } = await validateUserAndBoardAccess(column.boardId, req.user.id, token);
 
-    const allCards = await Card.find({ columnId });
-
-    if (board.userId.toString() === req.user.id) {
-      return res.json(allCards);
+    // Kiểm tra xem người dùng có phải là chủ sở hữu bảng hoặc có lời mời cột đã chấp nhận hay không
+    const isBoardOwner = board.userId.toString() === req.user.id;
+    let hasColumnAccess = false;
+    if (!isBoardOwner) {
+      const columnInvitations = await checkColumnInvitation(null, columnId, req.user.id, token);
+      hasColumnAccess = columnInvitations.some(inv => inv.status === 'accepted');
     }
 
-    const cardInvitations = await checkCardsInvitedInColumn(columnId, req.user.id, token);
-    const allowedCardIds = cardInvitations
-      .filter(inv => inv.status === 'accepted')
-      .map(inv => inv.cardId.toString());
-    const allowedCards = allCards.filter(card => allowedCardIds.includes(card._id.toString()));
-    res.json(allowedCards);
+    if (!isBoardOwner && !hasColumnAccess) {
+      throwError(ERROR_MESSAGES.NOT_INVITED_TO_COLUMN, STATUS_CODES.FORBIDDEN);
+    }
+
+    // Lấy tất cả thẻ trong cột
+    const allCards = await Card.find({ columnId });
+    res.json(allCards);
   } catch (error) {
     next(error);
   }
@@ -141,13 +144,6 @@ const getCardById = async (req, res, next) => {
       throwError(ERROR_MESSAGES.CARD_NOT_FOUND, STATUS_CODES.NOT_FOUND);
     }
     const { column, board } = await validateColumnAndBoard(card.columnId, req.user.id, token);
-    // Cho phép board owner hoặc người được mời vào card truy cập
-    if (board.userId.toString() !== req.user.id) {
-      const cardInvitations = await checkCardInvitation(id, req.user.id, token);
-      if (!cardInvitations.some(inv => inv.status === 'accepted')) {
-        throwError(ERROR_MESSAGES.UNAUTHORIZED, STATUS_CODES.FORBIDDEN);
-      }
-    }
     res.json(card);
   } catch (error) {
     next(error);
@@ -169,13 +165,6 @@ const deleteCard = async (req, res, next) => {
       throwError(ERROR_MESSAGES.INVALID_COLUMN_ID, STATUS_CODES.BAD_REQUEST);
     }
     const { column, board } = await validateColumnAndBoard(card.columnId, req.user.id, token);
-    // Cho phép board owner hoặc người được mời vào card xóa
-    if (board.userId.toString() !== req.user.id) {
-      const cardInvitations = await checkCardInvitation(id, req.user.id, token);
-      if (!cardInvitations.some(inv => inv.status === 'accepted')) {
-        throwError(ERROR_MESSAGES.NOT_INVITED_TO_CARD, STATUS_CODES.FORBIDDEN);
-      }
-    }
     await card.deleteOne();
     const newCardOrderIds = column.cardOrderIds.filter(cardId => cardId.toString() !== id);
     await updateColumnCardOrder(column._id, newCardOrderIds, token);
@@ -202,13 +191,6 @@ const updateCard = async (req, res, next) => {
       throwError(ERROR_MESSAGES.INVALID_COLUMN_ID, STATUS_CODES.BAD_REQUEST);
     }
     const { column, board } = await validateColumnAndBoard(card.columnId, req.user.id, token);
-    // Cho phép board owner hoặc người được mời vào card sửa
-    if (board.userId.toString() !== req.user.id) {
-      const cardInvitations = await checkCardInvitation(id, req.user.id, token);
-      if (!cardInvitations.some(inv => inv.status === 'accepted')) {
-        throwError(ERROR_MESSAGES.NOT_INVITED_TO_CARD, STATUS_CODES.FORBIDDEN);
-      }
-    }
     card.title = title !== undefined ? title : card.title;
     card.description = description !== undefined ? description : card.description;
     card.updatedAt = Date.now();
