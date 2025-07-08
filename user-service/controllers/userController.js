@@ -2,21 +2,22 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/userModel');
 const { throwError, extractToken } = require('../utils/helpers');
 const { STATUS_CODES, ERROR_MESSAGES } = require('../utils/constants');
+const { streamUpload } = require('../config/CloudinaryProvider');
 
 const registerUser = async (req, res, next) => {
   try {
-    const { username, email, password } = req.body;
+    const { username, email, password, avatar } = req.body;
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       throwError(ERROR_MESSAGES.USER_ALREADY_EXISTS, STATUS_CODES.BAD_REQUEST);
     }
 
-    const user = new User({ username, email, password });
+    const user = new User({ username, email, password, avatar });
     await user.save();
 
     res.status(STATUS_CODES.CREATED).json({
-      user: { id: user._id, username, email },
+      user: { id: user._id, username, email, avatar: user.avatar },
     });
   } catch (error) {
     next(error);
@@ -109,6 +110,45 @@ const getUserByEmail = async (req, res, next) => {
   }
 };
 
+const changeAvatarHandler = async (req, res, next) => {
+  try {
+    if (!req.user || !req.user.id) {
+      throwError(ERROR_MESSAGES.NO_TOKEN, STATUS_CODES.UNAUTHORIZED);
+    }
+    if (!req.file) {
+      throwError('No file uploaded', STATUS_CODES.BAD_REQUEST);
+    }
+
+    const userId = req.user.id;
+    const fileBuffer = req.file.buffer;
+
+    // Upload image to Cloudinary
+    const result = await streamUpload(fileBuffer, 'avatars');
+
+    // Update user's avatar
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { avatar: result.secure_url },
+      { new: true, select: 'username email avatar' }
+    );
+
+    if (!updatedUser) {
+      throwError(ERROR_MESSAGES.USER_NOT_FOUND, STATUS_CODES.NOT_FOUND);
+    }
+
+    res.status(STATUS_CODES.OK).json({
+      user: {
+        id: updatedUser._id,
+        username: updatedUser.username,
+        email: updatedUser.email,
+        avatar: updatedUser.avatar
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
@@ -117,4 +157,5 @@ module.exports = {
   getAllUsers,
   getUserByEmail,
   authMiddleware,
+  changeAvatarHandler
 };
