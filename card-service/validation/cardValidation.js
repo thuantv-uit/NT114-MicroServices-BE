@@ -6,7 +6,7 @@ const createCardSchema = Joi.object({
     'string.max': 'Tiêu đề không được vượt quá 100 ký tự',
     'any.required': 'Tiêu đề là bắt buộc',
   }),
-  description: Joi.string().max(500).optional().messages({
+  description: Joi.string().max(10000).optional().messages({
     'string.max': 'Mô tả không được vượt quá 500 ký tự',
   }),
   columnId: Joi.string().length(24).hex().required().messages({
@@ -26,7 +26,7 @@ const updateCardSchema = Joi.object({
     'string.min': 'Tiêu đề phải có ít nhất 3 ký tự',
     'string.max': 'Tiêu đề không được vượt quá 100 ký tự',
   }),
-  description: Joi.string().max(500).optional().messages({
+  description: Joi.string().max(10000).optional().messages({
     'string.max': 'Mô tả không được vượt quá 500 ký tự',
   }),
   process: Joi.number().min(0).max(100).optional().messages({
