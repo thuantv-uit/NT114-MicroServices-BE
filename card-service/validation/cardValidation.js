@@ -1,7 +1,7 @@
 const Joi = require('joi');
 
 const createCardSchema = Joi.object({
-  title: Joi.string().min(3).max(100).required().messages({
+  title: Joi.string().min(3).max(1000).required().messages({
     'string.min': 'Tiêu đề phải có ít nhất 3 ký tự',
     'string.max': 'Tiêu đề không được vượt quá 100 ký tự',
     'any.required': 'Tiêu đề là bắt buộc',
@@ -22,7 +22,7 @@ const createCardSchema = Joi.object({
 });
 
 const updateCardSchema = Joi.object({
-  title: Joi.string().min(3).max(100).optional().messages({
+  title: Joi.string().min(3).max(1000).optional().messages({
     'string.min': 'Tiêu đề phải có ít nhất 3 ký tự',
     'string.max': 'Tiêu đề không được vượt quá 100 ký tự',
   }),

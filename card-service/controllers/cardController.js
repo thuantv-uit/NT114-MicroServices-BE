@@ -7,6 +7,7 @@ const { checkColumnInvitation } = require('../services/invitation');
 const { extractToken, throwError, isValidObjectId } = require('../utils/helpers');
 const { STATUS_CODES, ERROR_MESSAGES } = require('../utils/constants');
 const { validateUserAndBoardAccess } = require('../utils/permissions');
+const { streamUpload } = require('../config/CloudinaryProvider');
 
 const authMiddleware = (req, res, next) => {
   const token = extractToken(req);
@@ -95,7 +96,8 @@ const createCard = async (req, res, next) => {
       title, 
       description, 
       columnId, 
-      process: process !== undefined ? process : 0 
+      process: process !== undefined ? process : 0 ,
+      userId: req.user.id
     });
     await card.save();
 
@@ -219,4 +221,46 @@ const updateCard = async (req, res, next) => {
   }
 };
 
-module.exports = { createCard, getCardsByColumn, getCardById, updateCard, deleteCard, authMiddleware };
+const updateCardImage = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const token = extractToken(req);
+    if (!isValidObjectId(id)) {
+      throwError(ERROR_MESSAGES.INVALID_CARD_ID, STATUS_CODES.BAD_REQUEST);
+    }
+    if (!req.file) {
+      throwError('No file uploaded', STATUS_CODES.BAD_REQUEST);
+    }
+    const card = await Card.findById(id);
+    if (!card) {
+      throwError(ERROR_MESSAGES.CARD_NOT_FOUND, STATUS_CODES.NOT_FOUND);
+    }
+    if (!card.columnId || !isValidObjectId(card.columnId)) {
+      throwError(ERROR_MESSAGES.INVALID_COLUMN_ID, STATUS_CODES.BAD_REQUEST);
+    }
+    const { column, board } = await validateColumnAndBoard(card.columnId, req.user.id, token);
+
+    // Upload image to Cloudinary
+    const result = await streamUpload(req.file.buffer, 'card_images');
+
+    // Update card's image
+    card.image = result.secure_url;
+    card.updatedAt = Date.now();
+    await card.save();
+
+    res.status(STATUS_CODES.OK).json({
+      card: {
+        id: card._id,
+        title: card.title,
+        description: card.description,
+        columnId: card.columnId,
+        process: card.process,
+        image: card.image,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { createCard, getCardsByColumn, getCardById, updateCard, deleteCard, authMiddleware, updateCardImage };
