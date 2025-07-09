@@ -23,6 +23,9 @@ const updateColumnSchema = Joi.object({
     'string.min': 'Title must be at least 3 characters long',
     'string.max': 'Title must not exceed 100 characters',
   }),
+  backgroundColor: Joi.string().pattern(/^#[0-9A-Fa-f]{6}$/).optional().messages({
+      'string.pattern.base': 'Background color must be a valid hex color code (e.g., #FFFFFF)',
+    }),
   cardOrderIds: Joi.alternatives().try(
     Joi.array().items(Joi.string().length(24).hex()).optional().messages({
       'array.base': 'Card ID list must be an array',

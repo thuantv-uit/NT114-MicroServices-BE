@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 
 const columnSchema = new mongoose.Schema({
   title: { type: String, required: true },
+  backgroundColor: { type: String, default: '#ffffff' },
   boardId: { type: mongoose.Schema.Types.ObjectId, ref: 'Board', required: true },
   cardOrderIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Card', default: [] }],
   createdAt: { type: Date, default: Date.now },

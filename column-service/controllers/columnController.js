@@ -24,7 +24,7 @@ const authMiddleware = (req, res, next) => {
 
 const createColumn = async (req, res, next) => {
   try {
-    const { title, boardId } = req.body;
+    const { title, boardId, backgroundColor } = req.body;
     const token = extractToken(req);
     if (!isValidObjectId(boardId)) {
       throwError(ERROR_MESSAGES.INVALID_ID, STATUS_CODES.BAD_REQUEST);
@@ -35,7 +35,7 @@ const createColumn = async (req, res, next) => {
       throwError(ERROR_MESSAGES.NOT_BOARD_OWNER, STATUS_CODES.FORBIDDEN);
     }
 
-    const column = new Column({ title, boardId });
+    const column = new Column({ title, boardId, backgroundColor });
     await column.save();
 
     const newColumnOrderIds = [...(board.columnOrderIds || []), column._id.toString()];
@@ -51,7 +51,7 @@ const createColumn = async (req, res, next) => {
 const updateColumn = async (req, res, next) => {
   try {
     const { columnId } = req.params;
-    const { title, cardOrderIds } = req.body;
+    const { title, backgroundColor, cardOrderIds} = req.body;
     const token = extractToken(req);
     if (!isValidObjectId(columnId)) {
       throwError(ERROR_MESSAGES.INVALID_COLUMN_ID, STATUS_CODES.BAD_REQUEST);
@@ -87,6 +87,7 @@ const updateColumn = async (req, res, next) => {
     }
 
     column.title = title !== undefined ? title : column.title;
+    column.backgroundColor = backgroundColor !== undefined ? backgroundColor : column.backgroundColor;
     column.cardOrderIds = cardOrderIds !== undefined ? cardOrderIds : column.cardOrderIds;
     column.updatedAt = Date.now();
     await column.save();
