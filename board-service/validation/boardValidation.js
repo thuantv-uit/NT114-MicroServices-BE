@@ -32,9 +32,8 @@ const updateBoardSchema = Joi.object({
   description: Joi.string().max(500).optional().messages({
     'string.max': 'Description must not exceed 500 characters',
   }),
-  backgroundColor: Joi.string().pattern(/^#[0-9A-Fa-f]{6}$/).optional().messages({
-    'string.pattern.base': 'Background color must be a valid hex color code (e.g., #FFFFFF)',
-  }),
+  backgroundColor: Joi.string().allow('').optional(),
+  backgroundImage: Joi.string().allow('').optional(),
   memberIds: Joi.array().items(Joi.string().length(24).hex()).optional().messages({
     'array.base': 'Member list must be an array',
     'string.length': 'Each member ID must be 24 characters long',

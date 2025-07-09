@@ -5,6 +5,7 @@ const { checkUserExists } = require('../services/user');
 const { checkBoardInvitation } = require('../services/invitation');
 const { extractToken, throwError, isValidObjectId } = require('../utils/helpers');
 const { STATUS_CODES, ERROR_MESSAGES } = require('../utils/constants');
+const { streamUpload } = require('../config/CloudinaryProvider');
 
 const authMiddleware = (req, res, next) => {
   const token = extractToken(req);
@@ -41,7 +42,7 @@ const validateUserAndBoardAccess = async (boardId, userId, token) => {
 
 const createBoard = async (req, res, next) => {
   try {
-    const { title, description, backgroundColor } = req.body;
+    const { title, description, backgroundColor, backgroundImage } = req.body;
     const token = extractToken(req);
     const user = await checkUserExists(req.user.id, token);
     if (!user) {
@@ -51,6 +52,7 @@ const createBoard = async (req, res, next) => {
       title,
       description,
       backgroundColor,
+      backgroundImage,
       userId: req.user.id,
     });
     await board.save();
@@ -131,11 +133,23 @@ const updateBoard = async (req, res, next) => {
     if (board.userId.toString() !== req.user.id) {
       throwError(ERROR_MESSAGES.NOT_BOARD_OWNER, STATUS_CODES.FORBIDDEN);
     }
+
+    // Update fields
     board.title = title !== undefined ? title : board.title;
     board.description = description !== undefined ? description : board.description;
-    board.backgroundColor = backgroundColor !== undefined ? backgroundColor : board.backgroundColor;
+    if (backgroundColor !== undefined) {
+      board.backgroundColor = backgroundColor;
+      board.backgroundColorUpdatedAt = Date.now();
+    }
+    // Handle background image upload to Cloudinary
+    if (req.file) {
+      const result = await streamUpload(req.file.buffer, 'board_images');
+      board.backgroundImage = result.secure_url;
+      board.backgroundImageUpdatedAt = Date.now();
+    }
     board.columnOrderIds = columnOrderIds !== undefined ? columnOrderIds : board.columnOrderIds;
     board.updatedAt = Date.now();
+
     await board.save();
     res.json(board);
   } catch (error) {
