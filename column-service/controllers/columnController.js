@@ -178,6 +178,29 @@ const getColumnById = async (req, res, next) => {
   }
 };
 
+const getColumnByIdForAll = async (req, res, next) => {
+  try {
+    const { columnId } = req.params;
+    const token = extractToken(req);
+    if (!isValidObjectId(columnId)) {
+      throwError(ERROR_MESSAGES.INVALID_COLUMN_ID, STATUS_CODES.BAD_REQUEST);
+    }
+    const column = await Column.findById(columnId);
+    if (!column) {
+      throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
+    }
+    // Chỉ kiểm tra user tồn tại, không kiểm tra quyền truy cập
+    // const user = await checkUserExists(req.user.id, token);
+    // if (!user) {
+    //   throwError(ERROR_MESSAGES.USER_NOT_FOUND, STATUS_CODES.NOT_FOUND);
+    // }
+
+    res.json(column);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   authMiddleware,
   createColumn,
@@ -185,4 +208,5 @@ module.exports = {
   deleteColumn,
   getColumnsByBoard,
   getColumnById,
+  getColumnByIdForAll
 };

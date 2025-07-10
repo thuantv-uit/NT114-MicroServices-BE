@@ -7,6 +7,7 @@ const {
   deleteColumn,
   getColumnsByBoard,
   getColumnById,
+  getColumnByIdForAll
 } = require('../controllers/columnController');
 const validate = require('../middleware/validate');
 const errorHandler = require('../middleware/errorHandler');
@@ -19,6 +20,7 @@ router.put('/:columnId', validate(updateColumnSchema), updateColumn);
 router.delete('/:columnId', deleteColumn);
 router.get('/board/:boardId', getColumnsByBoard);
 router.get('/:columnId', getColumnById);
+router.get('/all/:columnId', getColumnByIdForAll);
 
 router.use(errorHandler);
 

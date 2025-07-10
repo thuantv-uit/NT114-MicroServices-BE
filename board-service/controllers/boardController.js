@@ -121,6 +121,27 @@ const getBoardById = async (req, res, next) => {
   }
 };
 
+const allUserGetBoard = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const token = extractToken(req);
+    if (!isValidObjectId(id)) {
+      throwError(ERROR_MESSAGES.INVALID_ID, STATUS_CODES.BAD_REQUEST);
+    }
+    const user = await checkUserExists(req.user.id, token);
+    if (!user) {
+      throwError(ERROR_MESSAGES.USER_NOT_FOUND, STATUS_CODES.NOT_FOUND);
+    }
+    const board = await Board.findById(id);
+    if (!board) {
+      throwError(ERROR_MESSAGES.BOARD_NOT_FOUND, STATUS_CODES.NOT_FOUND);
+    }
+    res.json(board);
+  } catch (error) {
+    next(error);
+  }
+};
+
 const updateBoard = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -180,6 +201,7 @@ module.exports = {
   createBoard,
   getBoards,
   getBoardById,
+  allUserGetBoard,
   updateBoard,
   deleteBoard,
 };
