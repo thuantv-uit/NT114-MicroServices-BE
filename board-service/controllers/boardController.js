@@ -196,6 +196,25 @@ const deleteBoard = async (req, res, next) => {
   }
 };
 
+const getLatestBoardId = async (req, res, next) => {
+  try {
+    const token = extractToken(req);
+    const user = await checkUserExists(req.user.id, token);
+    if (!user) {
+      throwError(ERROR_MESSAGES.USER_NOT_FOUND, STATUS_CODES.NOT_FOUND);
+    }
+    const latestBoard = await Board.findOne({ userId: req.user.id })
+      .sort({ createdAt: -1 }) // Sắp xếp theo createdAt giảm dần để lấy board mới nhất
+      .select('_id'); // Chỉ lấy trường _id
+    if (!latestBoard) {
+      throwError(ERROR_MESSAGES.NO_BOARDS_FOUND, STATUS_CODES.NOT_FOUND);
+    }
+    res.json({ boardId: latestBoard._id });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   authMiddleware,
   createBoard,
@@ -204,4 +223,5 @@ module.exports = {
   allUserGetBoard,
   updateBoard,
   deleteBoard,
+  getLatestBoardId,
 };
