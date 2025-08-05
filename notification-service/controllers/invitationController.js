@@ -2,7 +2,7 @@ const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const Invitation = require('../models/invitationModel');
 const { checkUserExists, checkUserExistsByEmail } = require('../services/user');
-const { getBoardById } = require('../services/board');
+const { getBoardById, updateMemberIds } = require('../services/board');
 const { getColumnById } = require('../services/column');
 const { extractToken, throwError, isValidObjectId } = require('../utils/helpers');
 const { STATUS_CODES, ERROR_MESSAGES } = require('../utils/constants');
@@ -86,7 +86,7 @@ const validateInvitation = async (type, boardId, columnId, userId, invitedUserId
 
 const inviteToBoard = async (req, res, next) => {
   try {
-    const { boardId, email } = req.body;
+    const { boardId, email, role } = req.body;
     const token = extractToken(req);
     const invitedUser = await checkUserExistsByEmail(email, token);
     if (!invitedUser) {
@@ -107,6 +107,7 @@ const inviteToBoard = async (req, res, next) => {
       boardId,
       userId: invitedUser._id,
       invitedBy: req.user.id,
+      role: role || 'viewer', // Default to 'member' if no role is provided
     });
     await invitation.save();
     res.status(STATUS_CODES.CREATED).json({ message: ERROR_MESSAGES.INVITATION_SENT, invitation });
@@ -148,6 +149,36 @@ const inviteToColumn = async (req, res, next) => {
   }
 };
 
+// const acceptInvitation = async (req, res, next) => {
+//   try {
+//     const { invitationId } = req.params;
+//     const token = extractToken(req);
+//     if (!isValidObjectId(invitationId)) {
+//       throwError(ERROR_MESSAGES.INVALID_ID, STATUS_CODES.BAD_REQUEST);
+//     }
+//     const invitation = await Invitation.findById(invitationId);
+//     if (!invitation) {
+//       throwError(ERROR_MESSAGES.INVITATION_NOT_FOUND, STATUS_CODES.NOT_FOUND);
+//     }
+//     if (invitation.userId.toString() !== req.user.id) {
+//       throwError(ERROR_MESSAGES.UNAUTHORIZED, STATUS_CODES.FORBIDDEN);
+//     }
+//     if (invitation.status !== 'pending') {
+//       throwError(ERROR_MESSAGES.INVITATION_NOT_PENDING, STATUS_CODES.BAD_REQUEST);
+//     }
+//     invitation.status = 'accepted';
+//     await invitation.save();
+//     res.json({ 
+//       message: invitation.type === 'board' 
+//         ? 'Board invitation accepted. You need a column invitation to view or edit content.' 
+//         : 'Column invitation accepted. You can now view and edit cards in this column.', 
+//       invitation 
+//     });
+//   } catch (error) {
+//     next(error);
+//   }
+// };
+
 const acceptInvitation = async (req, res, next) => {
   try {
     const { invitationId } = req.params;
@@ -167,11 +198,31 @@ const acceptInvitation = async (req, res, next) => {
     }
     invitation.status = 'accepted';
     await invitation.save();
-    res.json({ 
-      message: invitation.type === 'board' 
-        ? 'Board invitation accepted. You need a column invitation to view or edit content.' 
-        : 'Column invitation accepted. You can now view and edit cards in this column.', 
-      invitation 
+
+    // Cập nhật memberIds trong board nếu là lời mời board
+    if (invitation.type === 'board') {
+      // const { updateMemberIds, getBoardById } = require('../services/board'); // Import cả getBoardById và updateMemberIds
+      const board = await getBoardById(invitation.boardId, req.user.id, token);
+      if (!board) {
+        throwError(ERROR_MESSAGES.BOARD_NOT_FOUND, STATUS_CODES.NOT_FOUND);
+      }
+      const newMember = {
+        userId: invitation.userId,
+        role: invitation.role || 'member', // Sử dụng role từ invitation
+      };
+      // Kiểm tra trùng lặp dựa trên dữ liệu từ getBoardById
+      const currentMemberIds = board.memberIds || [];
+      if (!currentMemberIds.some(member => member.userId.toString() === newMember.userId.toString())) {
+        const updatedMemberIds = [...currentMemberIds, newMember];
+        await updateMemberIds(invitation.boardId, updatedMemberIds, token);
+      }
+    }
+
+    res.json({
+      message: invitation.type === 'board'
+        ? 'Board invitation accepted. You need a column invitation to view or edit content.'
+        : 'Column invitation accepted. You can now view and edit cards in this column.',
+      invitation,
     });
   } catch (error) {
     next(error);

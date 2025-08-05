@@ -19,4 +19,23 @@ const getBoardById = async (boardId, userId, token) => {
   }
 };
 
-module.exports = { getBoardById };
+const updateMemberIds = async (boardId, memberIds, token) => {
+  try {
+    const response = await axios.put(
+      `${BOARD_SERVICE_URL}/api/boards/${boardId}/members`,
+      { memberIds },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response?.status === 404) {
+      throwError(ERROR_MESSAGES.BOARD_NOT_FOUND, STATUS_CODES.NOT_FOUND);
+    }
+    if (error.response?.status === 403) {
+      throwError(ERROR_MESSAGES.NOT_AUTHORIZED, STATUS_CODES.FORBIDDEN);
+    }
+    throwError(ERROR_MESSAGES.BOARD_UPDATE_ERROR, STATUS_CODES.INTERNAL_SERVER_ERROR);
+  }
+};
+
+module.exports = { getBoardById, updateMemberIds };
