@@ -19,6 +19,9 @@ const createCardSchema = Joi.object({
     'number.min': 'Mức độ hoàn thành phải từ 0 trở lên',
     'number.max': 'Mức độ hoàn thành không được vượt quá 100',
   }),
+  deadline: Joi.date().optional().messages({
+    'date.base': 'Deadline phải là một ngày hợp lệ',
+  }),
 });
 
 const updateCardSchema = Joi.object({
@@ -33,6 +36,9 @@ const updateCardSchema = Joi.object({
     'number.base': 'Mức độ hoàn thành phải là một số',
     'number.min': 'Mức độ hoàn thành phải từ 0 trở lên',
     'number.max': 'Mức độ hoàn thành không được vượt quá 100',
+  }),
+  deadline: Joi.date().optional().messages({
+    'date.base': 'Deadline phải là một ngày hợp lệ',
   }),
 });
 

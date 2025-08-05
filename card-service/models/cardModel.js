@@ -13,6 +13,7 @@ const cardSchema = new mongoose.Schema({
   },
   image : { type: String, default: '' },
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  deadline: { type: Date, required: false, default: null },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });

@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const Card = require('../models/cardModel');
-const { getColumnById, updateColumnCardOrder } = require('../services/column');
+const { getColumnById, updateColumnCardOrder, getColumnsByBoard } = require('../services/column');
 const { getBoardById } = require('../services/board');
 const { checkColumnInvitation } = require('../services/invitation');
 const { extractToken, throwError, isValidObjectId } = require('../utils/helpers');
@@ -67,7 +67,7 @@ const validateColumnAndBoard = async (columnId, userId, token) => {
 
 const createCard = async (req, res, next) => {
   try {
-    const { title, description, columnId, process } = req.body;
+    const { title, description, columnId, process, deadline } = req.body; // Thêm deadline
     const token = extractToken(req);
     if (!isValidObjectId(columnId)) {
       throwError(ERROR_MESSAGES.INVALID_COLUMN_ID, STATUS_CODES.BAD_REQUEST);
@@ -96,7 +96,8 @@ const createCard = async (req, res, next) => {
       title, 
       description, 
       columnId, 
-      process: process !== undefined ? process : 0 ,
+      process: process !== undefined ? process : 0,
+      deadline, // Thêm deadline
       userId: req.user.id
     });
     await card.save();
@@ -190,7 +191,7 @@ const deleteCard = async (req, res, next) => {
 const updateCard = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { title, description, process } = req.body;
+    const { title, description, process, deadline } = req.body; // Thêm deadline
     const token = extractToken(req);
     if (!isValidObjectId(id)) {
       throwError(ERROR_MESSAGES.INVALID_CARD_ID, STATUS_CODES.BAD_REQUEST);
@@ -212,6 +213,7 @@ const updateCard = async (req, res, next) => {
     card.title = title !== undefined ? title : card.title;
     card.description = description !== undefined ? description : card.description;
     card.process = process !== undefined ? process : card.process;
+    card.deadline = deadline !== undefined ? deadline : card.deadline; // Thêm deadline
     card.updatedAt = Date.now();
     await card.save();
 
@@ -263,4 +265,31 @@ const updateCardImage = async (req, res, next) => {
   }
 };
 
-module.exports = { createCard, getCardsByColumn, getCardById, updateCard, deleteCard, authMiddleware, updateCardImage };
+const getCardsByBoard = async (req, res, next) => {
+  try {
+    const { boardId } = req.params;
+    const token = extractToken(req);
+
+    // Kiểm tra boardId hợp lệ
+    if (!isValidObjectId(boardId)) {
+      throwError(ERROR_MESSAGES.INVALID_BOARD_ID, STATUS_CODES.BAD_REQUEST);
+    }
+
+    // Xác thực quyền truy cập vào board
+    const { board } = await validateUserAndBoardAccess(boardId, req.user.id, token);
+
+    // Lấy tất cả các cột thuộc board từ dịch vụ cột
+    const columns = await getColumnsByBoard(boardId, token);
+
+    // Lấy tất cả card thuộc các cột này
+    const columnIds = columns.map(column => column._id);
+    const cards = await Card.find({ columnId: { $in: columnIds } }).select('title deadline process');
+
+    // Trả về danh sách card với title, deadline, và process
+    res.json(cards);
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { createCard, getCardsByColumn, getCardById, updateCard, deleteCard, authMiddleware, updateCardImage, getCardsByBoard };
