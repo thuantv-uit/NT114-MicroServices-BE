@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const Invitation = require('../models/invitationModel');
 const { checkUserExists, checkUserExistsByEmail } = require('../services/user');
 const { getBoardById, updateMemberIds } = require('../services/board');
-const { getColumnById } = require('../services/column');
+const { getColumnById, updateColumnMemberIds } = require('../services/column');
 const { extractToken, throwError, isValidObjectId } = require('../utils/helpers');
 const { STATUS_CODES, ERROR_MESSAGES } = require('../utils/constants');
 
@@ -118,7 +118,7 @@ const inviteToBoard = async (req, res, next) => {
 
 const inviteToColumn = async (req, res, next) => {
   try {
-    const { boardId, columnId, email } = req.body;
+    const { boardId, columnId, email, role } = req.body; // Thêm role
     const token = extractToken(req);
     const invitedUser = await checkUserExistsByEmail(email, token);
     if (!invitedUser) {
@@ -141,6 +141,7 @@ const inviteToColumn = async (req, res, next) => {
       columnId,
       userId: invitedUser._id,
       invitedBy: req.user.id,
+      role: role || 'viewer', // Thêm role với default 'viewer'
     });
     await invitation.save();
     res.status(STATUS_CODES.CREATED).json({ message: ERROR_MESSAGES.INVITATION_SENT, invitation });
@@ -217,6 +218,24 @@ const acceptInvitation = async (req, res, next) => {
       }
     }
 
+    // Cập nhật memberIds trong column nếu là lời mời column
+    if (invitation.type === 'column') {
+      const column = await getColumnById(invitation.columnId, req.user.id, token);
+      if (!column) {
+        throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
+      }
+      const newMember = {
+        userId: invitation.userId,
+        role: invitation.role || 'member', // Sử dụng role từ invitation
+      };
+      // Kiểm tra trùng lặp dựa trên dữ liệu từ getColumnById
+      const currentMemberIds = column.memberIds || [];
+      if (!currentMemberIds.some(member => member.userId.toString() === newMember.userId.toString())) {
+        const updatedMemberIds = [...currentMemberIds, newMember];
+        await updateColumnMemberIds(invitation.columnId, updatedMemberIds, token);
+      }
+    }
+
     res.json({
       message: invitation.type === 'board'
         ? 'Board invitation accepted. You need a column invitation to view or edit content.'
@@ -227,6 +246,83 @@ const acceptInvitation = async (req, res, next) => {
     next(error);
   }
 };
+
+// const acceptInvitation1 = async (req, res, next) => {
+//   try {
+//     const { invitationId } = req.params;
+//     const token = extractToken(req);
+//     console.log(`Processing invitation ${invitationId} for user ${req.user.id}`);
+//     if (!isValidObjectId(invitationId)) {
+//       throwError(ERROR_MESSAGES.INVALID_ID, STATUS_CODES.BAD_REQUEST);
+//     }
+//     const invitation = await Invitation.findById(invitationId);
+//     if (!invitation) {
+//       throwError(ERROR_MESSAGES.INVITATION_NOT_FOUND, STATUS_CODES.NOT_FOUND);
+//     }
+//     if (invitation.userId.toString() !== req.user.id) {
+//       throwError(ERROR_MESSAGES.UNAUTHORIZED, STATUS_CODES.FORBIDDEN);
+//     }
+//     if (invitation.status !== 'pending') {
+//       throwError(ERROR_MESSAGES.INVITATION_NOT_PENDING, STATUS_CODES.BAD_REQUEST);
+//     }
+//     invitation.status = 'accepted';
+//     await invitation.save();
+
+//     // Cập nhật memberIds trong column nếu là lời mời column
+//     if (invitation.type === 'column') {
+//       const column = await getColumnById(invitation.columnId, req.user.id, token);
+//       if (!column) {
+//         throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
+//       }
+//       const newMember = {
+//         userId: invitation.userId,
+//         role: invitation.role || 'member',
+//       };
+//       // Kiểm tra và xử lý memberIds
+//       let currentMemberIds = column.memberIds || [];
+//       if (!Array.isArray(currentMemberIds)) {
+//         currentMemberIds = [];
+//       }
+//       if (!currentMemberIds.some(member => member.userId.toString() === newMember.userId.toString())) {
+//         const updatedMemberIds = [...currentMemberIds, newMember];
+//         await updateColumnMemberIds(invitation.columnId, updatedMemberIds, token);
+//       } else {
+//         console.log(`Member ${newMember.userId} already exists, skipping update`);
+//       }
+//     } else if (invitation.type === 'board') {
+//       const board = await getBoardById(invitation.boardId, req.user.id, token);
+//       if (!board) {
+//         throwError(ERROR_MESSAGES.BOARD_NOT_FOUND, STATUS_CODES.NOT_FOUND);
+//       }
+//       const newMember = {
+//         userId: invitation.userId,
+//         role: invitation.role || 'member',
+//       };
+//       let currentMemberIds = board.memberIds || [];
+//       if (!Array.isArray(currentMemberIds)) {
+//         console.warn('memberIds is not an array, initializing as empty array');
+//         currentMemberIds = [];
+//       }
+//       if (!currentMemberIds.some(member => member.userId.toString() === newMember.userId.toString())) {
+//         const updatedMemberIds = [...currentMemberIds, newMember];
+//         console.log(`Updating memberIds to:`, updatedMemberIds);
+//         await updateMemberIds(invitation.boardId, updatedMemberIds, token);
+//       } else {
+//         console.log(`Member ${newMember.userId} already exists, skipping update`);
+//       }
+//     }
+
+//     res.json({
+//       message: invitation.type === 'board'
+//         ? 'Board invitation accepted. You need a column invitation to view or edit content.'
+//         : 'Column invitation accepted. You can now view and edit cards in this column.',
+//       invitation,
+//     });
+//   } catch (error) {
+//     console.error(`Error in acceptInvitation for invitation ${invitationId}:`, error);
+//     next(error);
+//   }
+// };
 
 const rejectInvitation = async (req, res, next) => {
   try {

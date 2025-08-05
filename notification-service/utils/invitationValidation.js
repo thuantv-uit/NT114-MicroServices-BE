@@ -31,6 +31,10 @@ const inviteToColumnSchema = Joi.object({
     'string.email': 'Email must be a valid email address',
     'any.required': 'Email is required',
   }),
+  role: Joi.string().valid('admin', 'member', 'viewer').required().messages({
+    'string.valid': 'Role must be one of: admin, member, viewer',
+    'any.required': 'Role is required',
+  }),
 });
 
 module.exports = { inviteToBoardSchema, inviteToColumnSchema };
