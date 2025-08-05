@@ -54,6 +54,7 @@ const createBoard = async (req, res, next) => {
       backgroundColor,
       backgroundImage,
       userId: req.user.id,
+      memberIds: [], // Khởi tạo memberIds rỗng
     });
     await board.save();
     res.status(STATUS_CODES.CREATED).json(board);
@@ -215,6 +216,32 @@ const getLatestBoardId = async (req, res, next) => {
   }
 };
 
+const updateBoardMemberIds = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { memberIds } = req.body;
+    const token = extractToken(req);
+    if (!isValidObjectId(id)) {
+      throwError(ERROR_MESSAGES.INVALID_ID, STATUS_CODES.BAD_REQUEST);
+    }
+    const user = await checkUserExists(req.user.id, token);
+    if (!user) {
+      throwError(ERROR_MESSAGES.USER_NOT_FOUND, STATUS_CODES.NOT_FOUND);
+    }
+    const board = await Board.findById(id);
+    if (!board) {
+      throwError(ERROR_MESSAGES.BOARD_NOT_FOUND, STATUS_CODES.NOT_FOUND);
+    }
+    // Cập nhật memberIds
+    board.memberIds = memberIds;
+    board.updatedAt = Date.now();
+    await board.save();
+    res.json(board);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   authMiddleware,
   createBoard,
@@ -224,4 +251,5 @@ module.exports = {
   updateBoard,
   deleteBoard,
   getLatestBoardId,
+  updateBoardMemberIds
 };

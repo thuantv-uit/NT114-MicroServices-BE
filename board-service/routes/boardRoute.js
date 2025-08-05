@@ -10,10 +10,11 @@ const {
   authMiddleware,
   allUserGetBoard,
   getLatestBoardId,
+  updateBoardMemberIds
 } = require('../controllers/boardController');
 const validate = require('../middleware/validate');
 const errorHandler = require('../middleware/errorHandler');
-const { createBoardSchema, updateBoardSchema } = require('../validation/boardValidation');
+const { createBoardSchema, updateBoardSchema, updateMemberIdsSchema } = require('../validation/boardValidation');
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
@@ -25,6 +26,7 @@ router.get('/latest', getLatestBoardId);
 router.get('/:id', getBoardById);
 router.get('/all/:id', allUserGetBoard);
 router.put('/:id', validate(updateBoardSchema), upload.single('backgroundImage'), updateBoard);
+router.put('/:id/members', validate(updateMemberIdsSchema), updateBoardMemberIds);
 router.delete('/:id', deleteBoard);
 
 router.use(errorHandler);

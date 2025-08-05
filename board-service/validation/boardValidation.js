@@ -22,6 +22,21 @@ const createBoardSchema = Joi.object({
     'string.length': 'Each column ID must be 24 characters long',
     'string.hex': 'Column ID must be a hex string',
   }),
+  memberIds: Joi.array().items(
+    Joi.object({
+      userId: Joi.string().length(24).hex().required().messages({
+        'string.length': 'Each member ID must be 24 characters long',
+        'string.hex': 'Member ID must be a hex string',
+        'any.required': 'Member ID is required',
+      }),
+      role: Joi.string().valid('admin', 'member', 'viewer').required().messages({
+        'string.valid': 'Role must be one of: admin, member, viewer',
+        'any.required': 'Role is required',
+      }),
+    })
+  ).optional().default([]).messages({
+    'array.base': 'Member list must be an array',
+  }),
 });
 
 const updateBoardSchema = Joi.object({
@@ -67,4 +82,23 @@ const inviteUserSchema = Joi.object({
   }),
 });
 
-module.exports = { createBoardSchema, updateBoardSchema, inviteUserSchema };
+const updateMemberIdsSchema = Joi.object({
+  memberIds: Joi.array().items(
+    Joi.object({
+      userId: Joi.string().length(24).hex().required().messages({
+        'string.length': 'Each member ID must be 24 characters long',
+        'string.hex': 'Member ID must be a hex string',
+        'any.required': 'Member ID is required',
+      }),
+      role: Joi.string().valid('admin', 'member', 'viewer').required().messages({
+        'string.valid': 'Role must be one of: admin, member, viewer',
+        'any.required': 'Role is required',
+      }),
+    })
+  ).required().messages({
+    'array.base': 'Member list must be an array',
+    'any.required': 'Member list is required',
+  }),
+});
+
+module.exports = { createBoardSchema, updateBoardSchema, inviteUserSchema, updateMemberIdsSchema };
