@@ -22,6 +22,31 @@ const authMiddleware = (req, res, next) => {
   }
 };
 
+// const createColumn = async (req, res, next) => {
+//   try {
+//     const { title, boardId, backgroundColor } = req.body;
+//     const token = extractToken(req);
+//     if (!isValidObjectId(boardId)) {
+//       throwError(ERROR_MESSAGES.INVALID_ID, STATUS_CODES.BAD_REQUEST);
+//     }
+//     const { board } = await validateUserAndBoardAccess(boardId, req.user.id, token);
+//     // Chỉ board owner được tạo column
+//     if (board.userId.toString() !== req.user.id) {
+//       throwError(ERROR_MESSAGES.NOT_BOARD_OWNER, STATUS_CODES.FORBIDDEN);
+//     }
+
+//     const column = new Column({ title, boardId, backgroundColor });
+//     await column.save();
+
+//     const newColumnOrderIds = [...(board.columnOrderIds || []), column._id.toString()];
+//     await updateBoardColumnOrder(boardId, newColumnOrderIds, token);
+
+//     res.status(STATUS_CODES.CREATED).json(column);
+//   } catch (error) {
+//     next(error);
+//   }
+// };
+
 const createColumn = async (req, res, next) => {
   try {
     const { title, boardId, backgroundColor } = req.body;
@@ -30,12 +55,11 @@ const createColumn = async (req, res, next) => {
       throwError(ERROR_MESSAGES.INVALID_ID, STATUS_CODES.BAD_REQUEST);
     }
     const { board } = await validateUserAndBoardAccess(boardId, req.user.id, token);
-    // Chỉ board owner được tạo column
     if (board.userId.toString() !== req.user.id) {
       throwError(ERROR_MESSAGES.NOT_BOARD_OWNER, STATUS_CODES.FORBIDDEN);
     }
 
-    const column = new Column({ title, boardId, backgroundColor });
+    const column = new Column({ title, boardId, backgroundColor, memberIds: [] });
     await column.save();
 
     const newColumnOrderIds = [...(board.columnOrderIds || []), column._id.toString()];
@@ -201,6 +225,30 @@ const getColumnByIdForAll = async (req, res, next) => {
   }
 };
 
+const updateColumnMemberIds = async (req, res, next) => {
+  try {
+    const { columnId } = req.params;
+    const { memberIds } = req.body;
+    const token = extractToken(req);
+    if (!isValidObjectId(columnId)) {
+      throwError(ERROR_MESSAGES.INVALID_COLUMN_ID, STATUS_CODES.BAD_REQUEST);
+    }
+    const column = await Column.findById(columnId);
+    if (!column) {
+      throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
+    }
+    const { board } = await validateUserAndBoardAccess(column.boardId, req.user.id, token);
+
+    // Bất kỳ người dùng đã xác thực nào có thể cập nhật memberIds
+    column.memberIds = memberIds;
+    column.updatedAt = Date.now();
+    await column.save();
+    res.json(column);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   authMiddleware,
   createColumn,
@@ -208,5 +256,6 @@ module.exports = {
   deleteColumn,
   getColumnsByBoard,
   getColumnById,
-  getColumnByIdForAll
+  getColumnByIdForAll,
+  updateColumnMemberIds
 };

@@ -201,7 +201,6 @@ const acceptInvitation = async (req, res, next) => {
 
     // Cập nhật memberIds trong board nếu là lời mời board
     if (invitation.type === 'board') {
-      // const { updateMemberIds, getBoardById } = require('../services/board'); // Import cả getBoardById và updateMemberIds
       const board = await getBoardById(invitation.boardId, req.user.id, token);
       if (!board) {
         throwError(ERROR_MESSAGES.BOARD_NOT_FOUND, STATUS_CODES.NOT_FOUND);
