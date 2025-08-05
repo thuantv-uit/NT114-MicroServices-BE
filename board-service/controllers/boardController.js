@@ -179,6 +179,57 @@ const updateBoard = async (req, res, next) => {
   }
 };
 
+// const updateBoard = async (req, res, next) => {
+//   try {
+//     const { id } = req.params;
+//     const { title, description, backgroundColor, columnOrderIds } = req.body;
+//     const token = extractToken(req);
+//     console.log('Request body:', req.body); // Thêm log để debug
+//     if (!isValidObjectId(id)) {
+//       throwError(ERROR_MESSAGES.INVALID_ID, STATUS_CODES.BAD_REQUEST);
+//     }
+//     const { board } = await validateUserAndBoardAccess(id, req.user.id, token);
+//     if (board.userId.toString() !== req.user.id) {
+//       throwError(ERROR_MESSAGES.NOT_BOARD_OWNER, STATUS_CODES.FORBIDDEN);
+//     }
+//     let hasChanges = false;
+//     if (title !== undefined && title !== board.title) {
+//       board.title = title;
+//       hasChanges = true;
+//     }
+//     if (description !== undefined && description !== board.description) {
+//       board.description = description;
+//       hasChanges = true;
+//     }
+//     if (backgroundColor !== undefined && backgroundColor !== board.backgroundColor) {
+//       board.backgroundColor = backgroundColor;
+//       board.backgroundColorUpdatedAt = Date.now();
+//       hasChanges = true;
+//     }
+//     if (req.file) {
+//       const result = await streamUpload(req.file.buffer, 'board_images');
+//       board.backgroundImage = result.secure_url;
+//       board.backgroundImageUpdatedAt = Date.now();
+//       hasChanges = true;
+//     }
+//     if (columnOrderIds !== undefined && columnOrderIds !== board.columnOrderIds) {
+//       board.columnOrderIds = columnOrderIds;
+//       hasChanges = true;
+//     }
+//     if (hasChanges) {
+//       board.updatedAt = Date.now();
+//       await board.save();
+//       console.log('Board updated successfully:', board);
+//     } else {
+//       console.log('No changes detected in request body');
+//     }
+//     res.json(board);
+//   } catch (error) {
+//     console.error('Error in updateBoard:', error);
+//     next(error);
+//   }
+// };
+
 const deleteBoard = async (req, res, next) => {
   try {
     const { id } = req.params;
