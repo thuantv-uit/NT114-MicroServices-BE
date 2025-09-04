@@ -11,9 +11,13 @@ const cardSchema = new mongoose.Schema({
     default: 0, 
     required: true 
   },
-  image : { type: String, default: '' },
+  image: { type: String, default: '' },
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   deadline: { type: Date, required: false, default: null },
+  comments: [{
+    text: { type: String, required: true },
+    createdAt: { type: Date, default: Date.now },
+  }],
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });

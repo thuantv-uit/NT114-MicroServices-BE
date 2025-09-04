@@ -21,7 +21,7 @@ const authMiddleware = (req, res, next) => {
   }
 };
 
-const validateUserAndBoardAccess = async (boardId, userId, token) => {
+const validateUserAndBoardAccess = async (boardId, userId, token, requiredRole = ['admin']) => {
   const user = await checkUserExists(userId, token);
   if (!user) {
     throwError(ERROR_MESSAGES.USER_NOT_FOUND, STATUS_CODES.NOT_FOUND);
@@ -30,14 +30,19 @@ const validateUserAndBoardAccess = async (boardId, userId, token) => {
   if (!board) {
     throwError(ERROR_MESSAGES.BOARD_NOT_FOUND, STATUS_CODES.NOT_FOUND);
   }
-  // Kiểm tra user là owner hoặc được mời vào board
-  if (board.userId.toString() !== userId) {
-    const boardInvitation = await checkBoardInvitation(boardId, userId, token);
-    if (!boardInvitation || !boardInvitation.length) {
-      throwError(ERROR_MESSAGES.NOT_INVITED_TO_BOARD, STATUS_CODES.FORBIDDEN);
-    }
+  // Kiểm tra quyền truy cập
+  if (board.userId.toString() === userId) {
+    // Owner luôn có quyền admin
+    return { user, board, role: 'admin' };
   }
-  return { user, board };
+  const member = board.memberIds.find(m => m.userId.toString() === userId);
+  if (!member) {
+    throwError(ERROR_MESSAGES.NOT_INVITED_TO_BOARD, STATUS_CODES.FORBIDDEN);
+  }
+  if (!requiredRole.includes(member.role)) {
+    throwError(ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS, STATUS_CODES.FORBIDDEN);
+  }
+  return { user, board, role: member.role };
 };
 
 const createBoard = async (req, res, next) => {
@@ -101,21 +106,7 @@ const getBoardById = async (req, res, next) => {
     if (!isValidObjectId(id)) {
       throwError(ERROR_MESSAGES.INVALID_ID, STATUS_CODES.BAD_REQUEST);
     }
-    const user = await checkUserExists(req.user.id, token);
-    if (!user) {
-      throwError(ERROR_MESSAGES.USER_NOT_FOUND, STATUS_CODES.NOT_FOUND);
-    }
-    const board = await Board.findById(id);
-    if (!board) {
-      throwError(ERROR_MESSAGES.BOARD_NOT_FOUND, STATUS_CODES.NOT_FOUND);
-    }
-    // Kiểm tra user là owner hoặc được mời vào board
-    if (board.userId.toString() !== req.user.id) {
-      const boardInvitation = await checkBoardInvitation(id, req.user.id, token);
-      if (!boardInvitation || !boardInvitation.length) {
-        throwError(ERROR_MESSAGES.NOT_INVITED_TO_BOARD, STATUS_CODES.FORBIDDEN);
-      }
-    }
+    const { board } = await validateUserAndBoardAccess(id, req.user.id, token, ['admin', 'member', 'viewer']);
     res.json(board);
   } catch (error) {
     next(error);
@@ -151,11 +142,7 @@ const updateBoard = async (req, res, next) => {
     if (!isValidObjectId(id)) {
       throwError(ERROR_MESSAGES.INVALID_ID, STATUS_CODES.BAD_REQUEST);
     }
-    const { board } = await validateUserAndBoardAccess(id, req.user.id, token);
-    if (board.userId.toString() !== req.user.id) {
-      throwError(ERROR_MESSAGES.NOT_BOARD_OWNER, STATUS_CODES.FORBIDDEN);
-    }
-
+    const { board } = await validateUserAndBoardAccess(id, req.user.id, token, ['admin', 'member']);
     // Update fields
     board.title = title !== undefined ? title : board.title;
     board.description = description !== undefined ? description : board.description;
@@ -179,57 +166,6 @@ const updateBoard = async (req, res, next) => {
   }
 };
 
-// const updateBoard = async (req, res, next) => {
-//   try {
-//     const { id } = req.params;
-//     const { title, description, backgroundColor, columnOrderIds } = req.body;
-//     const token = extractToken(req);
-//     console.log('Request body:', req.body); // Thêm log để debug
-//     if (!isValidObjectId(id)) {
-//       throwError(ERROR_MESSAGES.INVALID_ID, STATUS_CODES.BAD_REQUEST);
-//     }
-//     const { board } = await validateUserAndBoardAccess(id, req.user.id, token);
-//     if (board.userId.toString() !== req.user.id) {
-//       throwError(ERROR_MESSAGES.NOT_BOARD_OWNER, STATUS_CODES.FORBIDDEN);
-//     }
-//     let hasChanges = false;
-//     if (title !== undefined && title !== board.title) {
-//       board.title = title;
-//       hasChanges = true;
-//     }
-//     if (description !== undefined && description !== board.description) {
-//       board.description = description;
-//       hasChanges = true;
-//     }
-//     if (backgroundColor !== undefined && backgroundColor !== board.backgroundColor) {
-//       board.backgroundColor = backgroundColor;
-//       board.backgroundColorUpdatedAt = Date.now();
-//       hasChanges = true;
-//     }
-//     if (req.file) {
-//       const result = await streamUpload(req.file.buffer, 'board_images');
-//       board.backgroundImage = result.secure_url;
-//       board.backgroundImageUpdatedAt = Date.now();
-//       hasChanges = true;
-//     }
-//     if (columnOrderIds !== undefined && columnOrderIds !== board.columnOrderIds) {
-//       board.columnOrderIds = columnOrderIds;
-//       hasChanges = true;
-//     }
-//     if (hasChanges) {
-//       board.updatedAt = Date.now();
-//       await board.save();
-//       console.log('Board updated successfully:', board);
-//     } else {
-//       console.log('No changes detected in request body');
-//     }
-//     res.json(board);
-//   } catch (error) {
-//     console.error('Error in updateBoard:', error);
-//     next(error);
-//   }
-// };
-
 const deleteBoard = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -237,10 +173,7 @@ const deleteBoard = async (req, res, next) => {
     if (!isValidObjectId(id)) {
       throwError(ERROR_MESSAGES.INVALID_ID, STATUS_CODES.BAD_REQUEST);
     }
-    const { board } = await validateUserAndBoardAccess(id, req.user.id, token);
-    if (board.userId.toString() !== req.user.id) {
-      throwError(ERROR_MESSAGES.NOT_BOARD_OWNER, STATUS_CODES.FORBIDDEN);
-    }
+    const { board } = await validateUserAndBoardAccess(id, req.user.id, token, ['admin']);
     await board.deleteOne();
     res.json({ message: ERROR_MESSAGES.BOARD_DELETED });
   } catch (error) {
@@ -272,21 +205,33 @@ const updateBoardMemberIds = async (req, res, next) => {
     const { id } = req.params;
     const { memberIds } = req.body;
     const token = extractToken(req);
+
+    // Kiểm tra ID hợp lệ
     if (!isValidObjectId(id)) {
       throwError(ERROR_MESSAGES.INVALID_ID, STATUS_CODES.BAD_REQUEST);
     }
+
+    // Kiểm tra user tồn tại
     const user = await checkUserExists(req.user.id, token);
     if (!user) {
       throwError(ERROR_MESSAGES.USER_NOT_FOUND, STATUS_CODES.NOT_FOUND);
     }
+
+    // Kiểm tra board tồn tại
     const board = await Board.findById(id);
     if (!board) {
       throwError(ERROR_MESSAGES.BOARD_NOT_FOUND, STATUS_CODES.NOT_FOUND);
     }
-    // Cập nhật memberIds
-    board.memberIds = memberIds;
+
+    // Thêm mới memberIds vào mảng hiện tại, loại bỏ trùng lặp
+    const newMemberIds = Array.isArray(memberIds) ? memberIds : [memberIds];
+    board.memberIds = [...new Set([...board.memberIds, ...newMemberIds])];
     board.updatedAt = Date.now();
+
+    // Lưu board
     await board.save();
+
+    // Trả về board đã cập nhật
     res.json(board);
   } catch (error) {
     next(error);

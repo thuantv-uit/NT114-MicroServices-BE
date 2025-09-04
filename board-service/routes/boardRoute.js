@@ -26,7 +26,7 @@ router.get('/latest', getLatestBoardId);
 router.get('/:id', getBoardById);
 router.get('/all/:id', allUserGetBoard);
 router.put('/:id', validate(updateBoardSchema), upload.single('backgroundImage'), updateBoard);
-router.put('/:id/members', validate(updateMemberIdsSchema), updateBoardMemberIds);
+router.post('/:id/members', validate(updateMemberIdsSchema), updateBoardMemberIds);
 router.delete('/:id', deleteBoard);
 
 router.use(errorHandler);

@@ -7,7 +7,7 @@ const BOARD_SERVICE_URL = process.env.BOARD_SERVICE_URL || 'http://localhost:300
 
 const getBoardById = async (boardId, userId, token) => {
   try {
-    const response = await axios.get(`${BOARD_SERVICE_URL}/api/boards/${boardId}`, {
+    const response = await axios.get(`${BOARD_SERVICE_URL}/api/boards/all/${boardId}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     return response.data;
@@ -21,11 +21,12 @@ const getBoardById = async (boardId, userId, token) => {
 
 const updateMemberIds = async (boardId, memberIds, token) => {
   try {
-    const response = await axios.put(
+    const response = await axios.post(
       `${BOARD_SERVICE_URL}/api/boards/${boardId}/members`,
       { memberIds },
       { headers: { Authorization: `Bearer ${token}` } }
     );
+    console.log('Member IDs updated successfully:', response.data);
     return response.data;
   } catch (error) {
     if (error.response?.status === 404) {

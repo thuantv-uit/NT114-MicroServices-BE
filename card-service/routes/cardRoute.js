@@ -10,6 +10,8 @@ const {
   authMiddleware,
   updateCardImage,
   getCardsByBoard,
+  addComment,
+  getCommentsByCard,
 } = require('../controllers/cardController');
 const validate = require('../middleware/validate');
 const errorHandler = require('../middleware/errorHandler');
@@ -26,6 +28,8 @@ router.get('/:id', getCardById);
 router.put('/:id', validate(updateCardSchema), updateCard);
 router.delete('/:id', deleteCard);
 router.post('/:id/image', upload.single('image'), updateCardImage);
+router.post('/:id/comments', addComment);
+router.get('/:id/comments', getCommentsByCard);
 router.use(errorHandler);
 
 module.exports = router;
