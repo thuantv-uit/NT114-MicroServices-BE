@@ -7,6 +7,7 @@ const invitationSchema = new mongoose.Schema({
   cardId: { type: mongoose.Schema.Types.ObjectId, ref: 'Card', required: function() { return this.type === 'card'; } },
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   invitedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  role: { type: String, enum: ['admin', 'member', 'viewer'], required: true },
   status: { type: String, enum: ['pending', 'accepted', 'rejected'], default: 'pending' },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },

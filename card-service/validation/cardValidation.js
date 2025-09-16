@@ -1,13 +1,13 @@
 const Joi = require('joi');
 
 const createCardSchema = Joi.object({
-  title: Joi.string().min(3).max(100).required().messages({
+  title: Joi.string().min(3).max(1000).required().messages({
     'string.min': 'Tiêu đề phải có ít nhất 3 ký tự',
-    'string.max': 'Tiêu đề không được vượt quá 100 ký tự',
+    'string.max': 'Tiêu đề không được vượt quá 1000 ký tự',
     'any.required': 'Tiêu đề là bắt buộc',
   }),
   description: Joi.string().max(10000).optional().messages({
-    'string.max': 'Mô tả không được vượt quá 500 ký tự',
+    'string.max': 'Mô tả không được vượt quá 10000 ký tự',
   }),
   columnId: Joi.string().length(24).hex().required().messages({
     'string.length': 'ID cột phải có 24 ký tự',
@@ -19,21 +19,35 @@ const createCardSchema = Joi.object({
     'number.min': 'Mức độ hoàn thành phải từ 0 trở lên',
     'number.max': 'Mức độ hoàn thành không được vượt quá 100',
   }),
+  deadline: Joi.date().optional().messages({
+    'date.base': 'Deadline phải là một ngày hợp lệ',
+  }),
 });
 
 const updateCardSchema = Joi.object({
-  title: Joi.string().min(3).max(100).optional().messages({
+  title: Joi.string().min(3).max(1000).optional().messages({
     'string.min': 'Tiêu đề phải có ít nhất 3 ký tự',
-    'string.max': 'Tiêu đề không được vượt quá 100 ký tự',
+    'string.max': 'Tiêu đề không được vượt quá 1000 ký tự',
   }),
   description: Joi.string().max(10000).optional().messages({
-    'string.max': 'Mô tả không được vượt quá 500 ký tự',
+    'string.max': 'Mô tả không được vượt quá 10000 ký tự',
   }),
   process: Joi.number().min(0).max(100).optional().messages({
     'number.base': 'Mức độ hoàn thành phải là một số',
     'number.min': 'Mức độ hoàn thành phải từ 0 trở lên',
     'number.max': 'Mức độ hoàn thành không được vượt quá 100',
   }),
+  deadline: Joi.date().optional().messages({
+    'date.base': 'Deadline phải là một ngày hợp lệ',
+  }),
 });
 
-module.exports = { createCardSchema, updateCardSchema };
+const addCommentSchema = Joi.object({
+  text: Joi.string().min(1).max(1000).required().messages({
+    'string.min': 'Bình luận phải có ít nhất 1 ký tự',
+    'string.max': 'Bình luận không được vượt quá 1000 ký tự',
+    'any.required': 'Bình luận là bắt buộc',
+  }),
+});
+
+module.exports = { createCardSchema, updateCardSchema, addCommentSchema };
