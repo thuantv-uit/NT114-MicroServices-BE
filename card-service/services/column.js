@@ -41,4 +41,21 @@ const updateColumnCardOrder = async (columnId, cardOrderIds, token) => {
   }
 };
 
-module.exports = { getColumnById, updateColumnCardOrder };
+const getColumnsByBoard = async (boardId, token) => {
+  try {
+    const response = await axios.get(`${COLUMN_SERVICE_URL}/api/columns/board/${boardId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.data;
+  } catch (error) {
+    if (error.response?.status === 404) {
+      throwError(ERROR_MESSAGES.NOT_FOUND_COLUMNS, STATUS_CODES.NOT_FOUND);
+    }
+    if (error.response?.status === 403) {
+      throwError(ERROR_MESSAGES.NOT_AUTHORIZED, STATUS_CODES.FORBIDDEN);
+    }
+    throwError(ERROR_MESSAGES.COLUMN_SERVICE_ERROR, STATUS_CODES.INTERNAL_SERVER_ERROR);
+  }
+};
+
+module.exports = { getColumnById, updateColumnCardOrder, getColumnsByBoard };
