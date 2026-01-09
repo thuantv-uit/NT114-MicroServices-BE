@@ -18,7 +18,12 @@ jobs:
 
     strategy:
       matrix:
-        service: ${{ fromJson(format('["%s"]', join(split(inputs.services, ','), '","'))) }}
+        service: 
+          - board-service
+          - card-service
+          - column-service
+          - notification-service
+          - user-service
 
     steps:
       - name: Checkout repository
