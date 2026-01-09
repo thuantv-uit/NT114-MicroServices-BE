@@ -11,40 +11,55 @@ on:
       - production
 
 jobs:
-  build-board-service:
-    uses: ./.github/workflows/build-service.yml
-    with:
-      service-name: board-service
-      package-lock-path: board-service/package-lock.json
+  build-services:
+    name: Build Services
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - board-service
+          - card-service
+          - column-service
+          - notification-service
+          - user-service
+      fail-fast: false  # Do not stop if one service fails, to collect logs
 
-  build-card-service:
     uses: ./.github/workflows/build-service.yml
     with:
-      service-name: card-service
-      package-lock-path: card-service/package-lock.json
-
-  build-column-service:
-    uses: ./.github/workflows/build-service.yml
-    with:
-      service-name: column-service
-      package-lock-path: column-service/package-lock.json
-
-  build-notification-service:
-    uses: ./.github/workflows/build-service.yml
-    with:
-      service-name: notification-service
-      package-lock-path: notification-service/package-lock.json
-
-  build-user-service:
-    uses: ./.github/workflows/build-service.yml
-    with:
-      service-name: user-service
-      package-lock-path: user-service/package-lock.json
+      service-name: ${{ matrix.service }}
+      package-lock-path: ${{ matrix.service }}/package-lock.json
+      output-dir: 'dist'  # Optional: pass if need to customize
 
   sonarqube:
+    name: SonarQube Analysis
     if: github.ref == 'refs/heads/main'
+    needs: build-services  # Optional: wait for builds if Sonar needs artifacts
     uses: ./.github/workflows/sonarqube.yml
+    # with: {}  # Add if sonarqube.yml needs inputs (e.g., project-key)
 
   trivy:
+    name: Trivy Vulnerability Scan
     if: github.ref == 'refs/heads/main'
+    needs: [build-services, sonarqube]  # Wait for builds and Sonar (skip scan if Sonar fails?)
     uses: ./.github/workflows/trivy.yml
+    with:
+      services: 'board-service,card-service,column-service,notification-service,user-service'  # Explicit, or omit to use default
+
+  # Optional: Final summary job (e.g., report overall status)
+  summary:
+    name: CI Summary
+    runs-on: ubuntu-latest
+    needs: [build-services, sonarqube, trivy]
+    if: always()  # Run regardless of success/failure
+    steps:
+      - name: Generate Summary Report
+        run: |
+          echo "Build Status: ${{ needs.build-services.result }}"
+          echo "SonarQube Status: ${{ needs.sonarqube.result || 'skipped' }}"
+          echo "Trivy Status: ${{ needs.trivy.result || 'skipped' }}"
+          if [[ "${{ needs.build-services.result }}" == "success" && "${{ needs.trivy.result }}" == "success" ]]; then
+            echo "✅ All checks passed!"
+          else
+            echo "❌ Some checks failed."
+            exit 1
+          fi
