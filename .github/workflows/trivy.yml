@@ -1,120 +1,113 @@
 name: Scan Pipeline
 
-# Kích hoạt pipeline khi push vào nhánh main hoặc khi có pull request nhắm đến nhánh main
 on:
-  workflow_call:  # Thay đổi để có thể gọi từ ci.yml
+  workflow_call:  # Designed to be called from another workflow (e.g., ci.yml)
+    inputs:
+      services:
+        description: 'List of services to scan (comma-separated, default: all five)'
+        required: false
+        type: string
+        default: 'board-service,card-service,column-service,notification-service,user-service'
+
 jobs:
   build-and-scan:
-    name: Xây dựng và Quét Hình ảnh Docker với Trivy
+    name: Build and Scan Docker Images with Trivy
     runs-on: ubuntu-latest
+    outputs:
+      datetime: ${{ steps.set-datetime.outputs.datetime }}
 
-    # Sử dụng matrix để chạy song song cho 5 dịch vụ
     strategy:
-      matrix:
-        service:
-          - board-service
-          - card-service
-          - column-service
-          - notification-service
-          - user-service
+  matrix:
+    service: >-
+      ${{ 
+        fromJson(
+          inputs.services ? 
+          format('["%s"]', join(split(inputs.services, ','), '","')) : 
+          '["board-service","card-service","column-service","notification-service","user-service"]'
+        ) 
+      }}
 
     steps:
-      # Bước 1: Sao chép mã nguồn từ kho lưu trữ
-      - name: Sao chép kho lưu trữ
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Bước 2: Thiết lập ngày và giờ để đặt tên tệp
-      - name: Thiết lập ngày và giờ
+      - name: Set up date and time
         id: set-datetime
-        run: echo "DATETIME=$(date +%Y%m%d-%H%M%S)" >> $GITHUB_ENV
+        run: |
+          DATETIME=$(date +%Y%m%d-%H%M%S)
+          echo "DATETIME=$DATETIME" >> $GITHUB_ENV
+          echo "datetime=$DATETIME" >> $GITHUB_OUTPUT  # For job output
 
-      # Bước 3: Xây dựng hình ảnh Docker từ Dockerfile của từng dịch vụ
-      - name: Xây dựng hình ảnh Docker cho ${{ matrix.service }}
+      - name: Build Docker image for ${{ matrix.service }}
         run: |
           docker build -t ${{ matrix.service }}:${{ env.DATETIME }} -f ${{ matrix.service }}/Dockerfile ${{ matrix.service }}
         env:
-          DOCKER_BUILDKIT: 1  # Kích hoạt BuildKit để xây dựng nhanh hơn
+          DOCKER_BUILDKIT: 1
 
-      # Bước 4: Tạo thư mục lưu kết quả
-      - name: Tạo thư mục lưu kết quả
+      - name: Create results directory
         run: mkdir -p trivy-results
 
-      # Bước 5: Cài đặt Trivy
-      - name: Cài đặt Trivy
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y curl
-          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sudo sh -s -- -b /usr/local/bin latest
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: '${{ matrix.service }}:${{ env.DATETIME }}'
+          format: 'json'
+          output: 'trivy-results/scan-results-${{ matrix.service }}-${{ env.DATETIME }}.json'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH,MEDIUM,LOW'
+          exit-code: '1'  # Fail workflow if CRITICAL vulns found
+          hide-progress: false
 
-      # Bước 6: Tải cơ sở dữ liệu lỗ hổng của Trivy
-      - name: Tải cơ sở dữ liệu lỗ hổng
-        run: trivy image --download-db-only
-
-      # Bước 7: Quét hình ảnh Docker với Trivy
-      - name: Quét hình ảnh ${{ matrix.service }} với Trivy
+      - name: Verify scan results file for ${{ matrix.service }}
         run: |
-          OUTPUT_FILE="trivy-results/scan-results-${{ matrix.service }}-${DATETIME}.json"
-          trivy image --format json --ignore-unfixed --vuln-type os,library --severity CRITICAL,HIGH,MEDIUM,LOW -o "$OUTPUT_FILE" ${{ matrix.service }}:${DATETIME}
-
-      # Bước 8: Kiểm tra tệp kết quả quét
-      - name: Kiểm tra tệp kết quả quét cho ${{ matrix.service }}
-        run: |
-          OUTPUT_FILE="trivy-results/scan-results-${{ matrix.service }}-${DATETIME}.json"
+          OUTPUT_FILE="trivy-results/scan-results-${{ matrix.service }}-${{ env.DATETIME }}.json"
           if [ -f "$OUTPUT_FILE" ]; then
             ls -l trivy-results/
           else
-            echo "Lỗi: Tệp kết quả quét không được tìm thấy!"
+            echo "Error: Scan results file not found!"
             exit 1
           fi
 
-      # Bước 9: Lưu kết quả quét dưới dạng artifact
-      - name: Lưu kết quả quét dưới dạng artifact cho ${{ matrix.service }}
+      - name: Upload scan results as artifact for ${{ matrix.service }}
         uses: actions/upload-artifact@v4
         with:
           name: trivy-scan-results-${{ matrix.service }}-${{ env.DATETIME }}
           path: trivy-results/scan-results-${{ matrix.service }}-${{ env.DATETIME }}.json
 
   push-results:
-    name: Đẩy Kết Quả Quét vào Nhánh trivy-results
+    name: Push Scan Results to trivy-results Branch
     runs-on: ubuntu-latest
-    needs: build-and-scan  # Đợi job build-and-scan hoàn thành
-    if: github.event_name == 'push'  # Chỉ chạy khi sự kiện là push
+    needs: build-and-scan
+    if: github.event_name == 'push'
 
     steps:
-      # Bước 1: Sao chép mã nguồn từ kho lưu trữ
-      - name: Sao chép kho lưu trữ
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Bước 2: Thiết lập ngày và giờ (phải khớp với job build-and-scan)
-      - name: Thiết lập ngày và giờ
-        id: set-datetime
-        run: echo "DATETIME=$(date +%Y%m%d-%H%M%S)" >> $GITHUB_ENV
-
-      # Bước 3: Tải tất cả artifact từ job build-and-scan
-      - name: Tải tất cả artifact kết quả quét
+      - name: Download all scan results artifacts
         uses: actions/download-artifact@v4
         with:
-          path: trivy-results
+          path: artifacts
 
-      # Bước 4: Đẩy kết quả quét vào nhánh trivy-results
-      - name: Đẩy kết quả quét vào nhánh trivy-results
+      - name: Push scan results to trivy-results branch
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DATETIME: ${{ needs.build-and-scan.outputs.datetime }}
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
           git fetch origin
           git checkout -B trivy-results origin/trivy-results || git checkout -b trivy-results
           mkdir -p trivy-results
-          # # Xóa tất cả file cũ trong thư mục trivy-results
-          # rm -rf trivy-results/*
-          # Di chuyển các file kết quả từ thư mục tải về
+          rm -rf trivy-results/*  # Clean old files to avoid accumulation
+          # Move files using shared DATETIME
           for service in board-service card-service column-service notification-service user-service; do
-            ARTIFACT_PATH="trivy-results/trivy-scan-results-${service}-${DATETIME}"
+            ARTIFACT_PATH="artifacts/trivy-scan-results-${service}-${DATETIME}"
             if [ -d "$ARTIFACT_PATH" ]; then
-              mv "$ARTIFACT_PATH/scan-results-${service}-${DATETIME}.json" trivy-results/
+              mv "$ARTIFACT_PATH"/*.json trivy-results/ || echo "No file for $service"
             fi
           done
           git add trivy-results/*
-          git commit -m "Thêm kết quả quét Trivy mới (${DATETIME})" || echo "Không có thay đổi để commit"
+          git commit -m "Add new Trivy scan results (${DATETIME})" || echo "No changes to commit"
           git push origin trivy-results
