@@ -51,39 +51,57 @@ jobs:
 
   docker-build-push:
     name: Build & Push Docker Images
-    # Chỉ chạy trên PR từ main vào production (hoặc push vào production nếu cần)
-    if: github.ref == 'refs/heads/production'
-    needs: [build-services, sonarqube, trivy]  # Chờ CI hoàn tất trước khi build image
+    # Chỉ chạy khi push/merge vào production
+    if: |
+      github.ref == 'refs/heads/production'
+    needs: [build-services, sonarqube, trivy]  # Skip OK
+    runs-on: ubuntu-latest  # Thêm explicit runs-on nếu dùng reusable workflow
+    steps:
+      - name: Debug Trigger
+        if: always()  # Luôn chạy debug
+        run: |
+          echo "Event name: ${{ github.event_name }}"
+          echo "Ref: ${{ github.ref }}"
+          echo "Expected: refs/heads/production"
+          if [[ "${{ github.ref }}" == "refs/heads/production" ]]; then
+            echo "✅ Condition true - should run!"
+          else
+            echo "❌ Condition false - skipped!"
+          fi
+      # Sau đó gọi reusable workflow (thêm steps này trước uses nếu cần)
+      # Nhưng vì dùng uses, debug ở đây trước
     uses: ./.github/workflows/docker-build-push.yml
     with:
-      # Có thể pass thêm inputs nếu cần (e.g., custom tags), nhưng ở đây dùng default
-      services: 'board-service,card-service,column-service,notification-service,user-service'  # Pass matrix services nếu muốn override
-    secrets: inherit  # Để workflow con truy cập secrets như DOCKERHUB_USERNAME, DOCKERHUB_TOKEN
+      services: '["board-service","card-service","column-service","notification-service","user-service"]'
+    secrets: inherit  # Kế thừa secrets từ workflow cha                  
 
   # Optional: Final summary job (e.g., report overall status)
   summary:
-    name: CI Summary
+    name: CI/CD Summary
     runs-on: ubuntu-latest
     needs: [build-services, sonarqube, trivy, docker-build-push]
     if: always()  # Run regardless of success/failure
     steps:
       - name: Generate Summary Report
         run: |
-          BUILD_RESULT="${{ needs.build-services.result }}"
+          BUILD_RESULT="${{ needs.build-services.result || 'skipped' }}"
           SONAR_RESULT="${{ needs.sonarqube.result || 'skipped' }}"
           TRIVY_RESULT="${{ needs.trivy.result || 'skipped' }}"
           DOCKER_RESULT="${{ needs.docker-build-push.result || 'skipped' }}"
+          echo "::group::Debug Results"  # Group log để dễ xem
           echo "Build Status: $BUILD_RESULT"
           echo "SonarQube Status: $SONAR_RESULT"
           echo "Trivy Status: $TRIVY_RESULT"
           echo "Docker Build & Push Status: $DOCKER_RESULT"
-          # Treat skipped as success for conditional jobs
+          echo "::endgroup::"
+          # Treat ALL skipped as success (dù main hay production)
           if [[ "$BUILD_RESULT" == "success" || "$BUILD_RESULT" == "skipped" ]] && 
-                ( "$SONAR_RESULT" == "success" || "$SONAR_RESULT" == "skipped" ) && 
-                ( "$TRIVY_RESULT" == "success" || "$TRIVY_RESULT" == "skipped" ) && 
-                ( "$DOCKER_RESULT" == "success" || "$DOCKER_RESULT" == "skipped" ) ]]; then
-            echo "✅ All checks passed (skipped jobs are OK for production deploy)!"
+              [[ "$SONAR_RESULT" == "success" || "$SONAR_RESULT" == "skipped" ]] && 
+              [[ "$TRIVY_RESULT" == "success" || "$TRIVY_RESULT" == "skipped" ]] && 
+              [[ "$DOCKER_RESULT" == "success" || "$DOCKER_RESULT" == "skipped" ]]; then
+            echo "✅ All checks passed (skipped jobs are OK)!"
+            exit 0  # Explicit success
           else
-            echo "❌ Some checks failed."
+            echo "❌ Some checks failed. Details above."
             exit 1
           fi
