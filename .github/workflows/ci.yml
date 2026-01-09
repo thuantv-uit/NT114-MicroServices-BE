@@ -23,7 +23,6 @@ jobs:
           - notification-service
           - user-service
       fail-fast: false  # Do not stop if one service fails, to collect logs
-
     uses: ./.github/workflows/build-service.yml
     with:
       service-name: ${{ matrix.service }}
