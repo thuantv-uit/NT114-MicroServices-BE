@@ -13,7 +13,6 @@ on:
 jobs:
   build-services:
     name: Build Services
-    runs-on: ubuntu-latest
     strategy:
       matrix:
         service:
