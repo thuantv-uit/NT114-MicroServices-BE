@@ -39,6 +39,3 @@ jobs:
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:${{ github.sha }} .
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:latest
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:${{ github.sha }}
-
-
-# Snippet from .github/workflows/ci.yml for context
