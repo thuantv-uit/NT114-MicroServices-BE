@@ -30,7 +30,7 @@ jobs:
 
   sonarqube:
     name: SonarQube Analysis
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/production'
     needs: build-services  # Optional: wait for builds if Sonar needs artifacts
     uses: ./.github/workflows/sonarqube.yml
     # with: {}  # Add if sonarqube.yml needs inputs (e.g., project-key)
