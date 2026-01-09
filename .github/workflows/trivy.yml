@@ -17,15 +17,13 @@ jobs:
       datetime: ${{ steps.set-datetime.outputs.datetime }}
 
     strategy:
-  matrix:
-    service: >-
-      ${{ 
-        fromJson(
-          inputs.services ? 
-          format('["%s"]', join(split(inputs.services, ','), '","')) : 
-          '["board-service","card-service","column-service","notification-service","user-service"]'
-        ) 
-      }}
+      matrix:
+        service: 
+          - board-service
+          - card-service
+          - column-service
+          - notification-service
+          - user-service
 
     steps:
       - name: Checkout repository
@@ -48,7 +46,7 @@ jobs:
         run: mkdir -p trivy-results
 
       - name: Run Trivy vulnerability scanner
-        uses: uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8
+        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8
         with:
           image-ref: '${{ matrix.service }}:${{ env.DATETIME }}'
           format: 'json'
