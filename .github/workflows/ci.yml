@@ -52,11 +52,15 @@ jobs:
     steps:
       - name: Generate Summary Report
         run: |
-          echo "Build Status: ${{ needs.build-services.result }}"
-          echo "SonarQube Status: ${{ needs.sonarqube.result || 'skipped' }}"
-          echo "Trivy Status: ${{ needs.trivy.result || 'skipped' }}"
-          if [[ "${{ needs.build-services.result }}" == "success" && "${{ needs.trivy.result }}" == "success" ]]; then
-            echo "✅ All checks passed!"
+          BUILD_RESULT="${{ needs.build-services.result }}"
+          SONAR_RESULT="${{ needs.sonarqube.result || 'skipped' }}"
+          TRIVY_RESULT="${{ needs.trivy.result || 'skipped' }}"
+          echo "Build Status: $BUILD_RESULT"
+          echo "SonarQube Status: $SONAR_RESULT"
+          echo "Trivy Status: $TRIVY_RESULT"
+          # Treat skipped as success for conditional jobs
+          if [[ "$BUILD_RESULT" == "success" && ( "$TRIVY_RESULT" == "success" || "$TRIVY_RESULT" == "skipped" ) ]]; then
+            echo "✅ All checks passed (skipped jobs are OK for non-main branches)!"
           else
             echo "❌ Some checks failed."
             exit 1
