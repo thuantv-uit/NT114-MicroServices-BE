@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service: ${{ fromJson(format('[ {0} ]', join(split(inputs.services, ','), '","'))) }}
+        service: ${{ fromJson(inputs.services) }}
       fail-fast: false
     steps:
       - name: Checkout code
