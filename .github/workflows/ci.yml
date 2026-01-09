@@ -8,11 +8,13 @@ on:
   pull_request:
     branches:
       - main
-      - production
 
 jobs:
   build-services:
     name: Build Services
+    if: |
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'pull_request' && github.base_ref == 'main')
     strategy:
       matrix:
         service:
@@ -30,14 +32,18 @@ jobs:
 
   sonarqube:
     name: SonarQube Analysis
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/production'
+    if: |
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'pull_request' && github.base_ref == 'main')
     needs: build-services  # Optional: wait for builds if Sonar needs artifacts
     uses: ./.github/workflows/sonarqube.yml
     # with: {}  # Add if sonarqube.yml needs inputs (e.g., project-key)
 
   trivy:
     name: Trivy Vulnerability Scan
-    if: github.ref == 'refs/heads/main'
+    if: |
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'pull_request' && github.base_ref == 'main')
     needs: [build-services, sonarqube]  # Wait for builds and Sonar (skip scan if Sonar fails?)
     uses: ./.github/workflows/trivy.yml
     with:
@@ -46,10 +52,7 @@ jobs:
   docker-build-push:
     name: Build & Push Docker Images
     # Chỉ chạy trên PR từ main vào production (hoặc push vào production nếu cần)
-    if: |
-      github.event_name == 'pull_request' &&
-      github.base_ref == 'production' &&
-      github.head_ref == 'main'
+    if: github.ref == 'refs/heads/production'
     needs: [build-services, sonarqube, trivy]  # Chờ CI hoàn tất trước khi build image
     uses: ./.github/workflows/docker-build-push.yml
     with:
@@ -75,11 +78,11 @@ jobs:
           echo "Trivy Status: $TRIVY_RESULT"
           echo "Docker Build & Push Status: $DOCKER_RESULT"
           # Treat skipped as success for conditional jobs
-          if [[ "$BUILD_RESULT" == "success" && 
+          if [[ "$BUILD_RESULT" == "success" || "$BUILD_RESULT" == "skipped" ]] && 
                 ( "$SONAR_RESULT" == "success" || "$SONAR_RESULT" == "skipped" ) && 
                 ( "$TRIVY_RESULT" == "success" || "$TRIVY_RESULT" == "skipped" ) && 
                 ( "$DOCKER_RESULT" == "success" || "$DOCKER_RESULT" == "skipped" ) ]]; then
-            echo "✅ All checks passed (skipped jobs are OK for non-main/PR-production branches)!"
+            echo "✅ All checks passed (skipped jobs are OK for production deploy)!"
           else
             echo "❌ Some checks failed."
             exit 1
