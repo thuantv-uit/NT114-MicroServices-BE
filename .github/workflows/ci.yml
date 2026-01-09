@@ -2,19 +2,13 @@ name: MicroService CI
 
 on:
   push:
-    branches:
-      - main
-      - production
-  pull_request:
-    branches:
-      - main
-
+    push:
+      branches: [main]
+    pull_request:
+      branches: [main]
 jobs:
   build-services:
     name: Build Services
-    if: |
-      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'pull_request' && github.base_ref == 'main')
     strategy:
       matrix:
         service:
@@ -32,94 +26,25 @@ jobs:
 
   sonarqube:
     name: SonarQube Analysis
-    if: |
-      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'pull_request' && github.base_ref == 'main')
     needs: build-services  # Optional: wait for builds if Sonar needs artifacts
     uses: ./.github/workflows/sonarqube.yml
     # with: {}  # Add if sonarqube.yml needs inputs (e.g., project-key)
 
   trivy:
     name: Trivy Vulnerability Scan
-    if: |
-      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'pull_request' && github.base_ref == 'main')
     needs: [build-services, sonarqube]  # Wait for builds and Sonar (skip scan if Sonar fails?)
     uses: ./.github/workflows/trivy.yml
     with:
       services: 'board-service,card-service,column-service,notification-service,user-service'  # Explicit, or omit to use default
 
-  docker-build-push:
-    name: Build & Push Docker Images
-    if: github.ref == 'refs/heads/production'
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        service:
-          - board-service
-          - card-service
-          - column-service
-          - notification-service
-          - user-service
-      fail-fast: false  # Giữ để build song song, không stop nếu 1 service fail
-    steps:
-      - name: Debug Trigger
-        run: |
-          echo "Event name: ${{ github.event_name }}"
-          echo "Ref: ${{ github.ref }}"
-          echo "Expected: refs/heads/production"
-          if [[ "${{ github.ref }}" == "refs/heads/production" ]]; then
-            echo "✅ Condition true - running Docker build!"
-          else
-            echo "❌ Condition false - job skipped!"
-            exit 0  # Không fail job nếu chỉ debug
-          fi
-
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Build and Push Docker Image for ${{ matrix.service }}
-        run: |
-          cd ${{ matrix.service }}
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:latest .
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:${{ github.sha }} .
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:latest
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:${{ github.sha }}
-          echo "✅ Pushed ${{ matrix.service }} images successfully!"                 
-
   # Optional: Final summary job (e.g., report overall status)
   summary:
-    name: CI/CD Summary
+    name: CI Summary
     runs-on: ubuntu-latest
-    needs: [build-services, sonarqube, trivy, docker-build-push]
-    if: always()  # Run regardless of success/failure
+    needs: [build-services, sonarqube, trivy]
+    if: always()
     steps:
-      - name: Generate Summary Report
-        run: |
-          BUILD_RESULT="${{ needs.build-services.result || 'skipped' }}"
-          SONAR_RESULT="${{ needs.sonarqube.result || 'skipped' }}"
-          TRIVY_RESULT="${{ needs.trivy.result || 'skipped' }}"
-          DOCKER_RESULT="${{ needs.docker-build-push.result || 'skipped' }}"
-          echo "::group::Debug Results"  # Group log để dễ xem
-          echo "Build Status: $BUILD_RESULT"
-          echo "SonarQube Status: $SONAR_RESULT"
-          echo "Trivy Status: $TRIVY_RESULT"
-          echo "Docker Build & Push Status: $DOCKER_RESULT"
-          echo "::endgroup::"
-          # Treat ALL skipped as success (dù main hay production)
-          if [[ "$BUILD_RESULT" == "success" || "$BUILD_RESULT" == "skipped" ]] && 
-              [[ "$SONAR_RESULT" == "success" || "$SONAR_RESULT" == "skipped" ]] && 
-              [[ "$TRIVY_RESULT" == "success" || "$TRIVY_RESULT" == "skipped" ]] && 
-              [[ "$DOCKER_RESULT" == "success" || "$DOCKER_RESULT" == "skipped" ]]; then
-            echo "✅ All checks passed (skipped jobs are OK)!"
-            exit 0  # Explicit success
-          else
-            echo "❌ Some checks failed. Details above."
-            exit 1
-          fi
+      - run: |
+          echo "Build: ${{ needs.build-services.result }}"
+          echo "Sonar: ${{ needs.sonarqube.result }}"
+          echo "Trivy: ${{ needs.trivy.result }}"
