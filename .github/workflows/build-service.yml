@@ -4,13 +4,18 @@ on:
   workflow_call:
     inputs:
       service-name:
-        description: 'Tên thư mục của dịch vụ (e.g., user-service, board-service)'
+        description: 'Name of the service directory (e.g., user-service, board-service)'
         required: true
         type: string
       package-lock-path:
-        description: 'Đường dẫn đến file package-lock.json (e.g., user-service/package-lock.json)'
+        description: 'Path to the package-lock.json file (e.g., user-service/package-lock.json)'
         required: true
         type: string
+      output-dir:
+        description: 'Build output directory (default: dist)'
+        required: false
+        type: string
+        default: 'dist'
 
 jobs:
   build:
@@ -22,34 +27,42 @@ jobs:
       fail-fast: false
 
     steps:
-      - name: Lấy mã nguồn
+      - name: Checkout source code
         uses: actions/checkout@v4
 
-      - name: Thiết lập Node.js ${{ matrix.node-version }}
+      - name: Set up Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
           cache-dependency-path: ${{ inputs.package-lock-path }}
 
-      - name: Cài đặt dependencies
+      - name: Install dependencies
         run: npm ci
         working-directory: ./${{ inputs.service-name }}
 
-      - name: Xây dựng
+      - name: Build
         run: npm run build -- --verbose
         env:
           NODE_ENV: production
         working-directory: ./${{ inputs.service-name }}
         continue-on-error: false
 
-      - name: Hiển thị chi tiết lỗi nếu thất bại
+      - name: Upload build artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ inputs.service-name }}-${{ matrix.node-version }}
+          path: ./${{ inputs.service-name }}/${{ inputs.output-dir }}
+          retention-days: 7
+
+      - name: Display error details if failed
         if: failure()
         run: |
-          echo "Kiểm tra các file log lỗi..."
-          find . -type f -name "*.log" -exec cat {} \; || echo "Không tìm thấy file log"
-          echo "Liệt kê các file trong thư mục build (nếu có)..."
-          ls -la dist/ || echo "Không tìm thấy thư mục dist/"
-          echo "Hiển thị thông tin chi tiết lỗi (nếu có)..."
-          npm run build -- --stack || echo "Không thể lấy stack trace"
+          echo "Checking error log files in service folder..."
+          find ./${{ inputs.service-name }} -type f -name "*.log" -exec cat {} \; || echo "No log files found"
+          echo "Listing files in ${{ inputs.output-dir }} directory (if exists)..."
+          ls -la ./${{ inputs.service-name }}/${{ inputs.output-dir }} || echo "${{ inputs.output-dir }} directory not found"
+          echo "Displaying detailed error information (if available)..."
+          npm run build -- --verbose --stack || echo "Unable to retrieve detailed stack trace"
         working-directory: ./${{ inputs.service-name }}
