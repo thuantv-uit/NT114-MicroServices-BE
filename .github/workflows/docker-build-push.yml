@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service: ${{ fromJson('[' + join(split(inputs.services, ','), '","') + ']') }}  # Parse comma-separated string thành array cho matrix
+        service: ${{ fromJson(format('[ {0} ]', join(split(inputs.services, ','), '","'))) }}
       fail-fast: false
     steps:
       - name: Checkout code
