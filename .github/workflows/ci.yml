@@ -51,29 +51,48 @@ jobs:
 
   docker-build-push:
     name: Build & Push Docker Images
-    # Chỉ chạy khi push/merge vào production
-    if: |
-      github.ref == 'refs/heads/production'
-    needs: [build-services, sonarqube, trivy]  # Skip OK
-    runs-on: ubuntu-latest  # Thêm explicit runs-on nếu dùng reusable workflow
+    if: github.ref == 'refs/heads/production'
+    needs: [build-services, sonarqube, trivy]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - board-service
+          - card-service
+          - column-service
+          - notification-service
+          - user-service
+      fail-fast: false  # Giữ để build song song, không stop nếu 1 service fail
     steps:
       - name: Debug Trigger
-        if: always()  # Luôn chạy debug
         run: |
           echo "Event name: ${{ github.event_name }}"
           echo "Ref: ${{ github.ref }}"
           echo "Expected: refs/heads/production"
           if [[ "${{ github.ref }}" == "refs/heads/production" ]]; then
-            echo "✅ Condition true - should run!"
+            echo "✅ Condition true - running Docker build!"
           else
-            echo "❌ Condition false - skipped!"
+            echo "❌ Condition false - job skipped!"
+            exit 0  # Không fail job nếu chỉ debug
           fi
-      # Sau đó gọi reusable workflow (thêm steps này trước uses nếu cần)
-      # Nhưng vì dùng uses, debug ở đây trước
-    uses: ./.github/workflows/docker-build-push.yml
-    with:
-      services: '["board-service","card-service","column-service","notification-service","user-service"]'
-    secrets: inherit  # Kế thừa secrets từ workflow cha                  
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and Push Docker Image for ${{ matrix.service }}
+        run: |
+          cd ${{ matrix.service }}
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:latest .
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:${{ github.sha }} .
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:latest
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:${{ github.sha }}
+          echo "✅ Pushed ${{ matrix.service }} images successfully!"                 
 
   # Optional: Final summary job (e.g., report overall status)
   summary:
