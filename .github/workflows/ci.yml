@@ -52,7 +52,6 @@ jobs:
   docker-build-push:
     name: Build & Push Docker Images
     if: github.ref == 'refs/heads/production'
-    needs: [build-services, sonarqube, trivy]
     runs-on: ubuntu-latest
     strategy:
       matrix:
