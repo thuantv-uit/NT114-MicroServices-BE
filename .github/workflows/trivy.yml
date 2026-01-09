@@ -48,7 +48,7 @@ jobs:
         run: mkdir -p trivy-results
 
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.33.1
         with:
           image-ref: '${{ matrix.service }}:${{ env.DATETIME }}'
           format: 'json'
