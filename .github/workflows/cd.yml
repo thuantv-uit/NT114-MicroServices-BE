@@ -1,27 +1,23 @@
-name: Docker Build & Push
+name: MicroService CD
 
 on:
-  workflow_call:  # Cho phép gọi từ workflow khác (reusable)
-    inputs:
-      services:
-        description: 'Comma-separated list of services to build'
-        required: false
-        type: string
-        default: 'board-service,card-service,column-service,notification-service,user-service'
-    secrets:
-      DOCKERHUB_USERNAME:
-        required: true
-      DOCKERHUB_TOKEN:
-        required: true
+  push:
+    branches: [production]
 
 jobs:
-  build-push:
-    name: Build & Push ${{ matrix.service }}
+  docker-build-push:
+    name: Build & Push Docker Images
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service: ${{ fromJson(inputs.services) }}
+        service:
+          - board-service
+          - card-service
+          - column-service
+          - notification-service
+          - user-service
       fail-fast: false
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -32,7 +28,7 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and Push Docker Image
+      - name: Build & Push ${{ matrix.service }}
         run: |
           cd ${{ matrix.service }}
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:latest .
