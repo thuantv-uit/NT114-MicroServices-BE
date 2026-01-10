@@ -31,7 +31,7 @@ jobs:
       - name: Build & Push ${{ matrix.service }}
         run: |
           cd ${{ matrix.service }}
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:latest .
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:${{ github.sha }} .
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:latest
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:${{ github.sha }}
+          docker build -t thuan410/${{ matrix.service }}:latest .
+          docker build -t thuan410/${{ matrix.service }}:${{ github.sha }} .
+          docker push thuan410/${{ matrix.service }}:latest
+          docker push thuan410/${{ matrix.service }}:${{ github.sha }}

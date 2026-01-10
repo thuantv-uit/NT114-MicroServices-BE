@@ -28,7 +28,8 @@ jobs:
     name: SonarQube Analysis
     needs: build-services  # Optional: wait for builds if Sonar needs artifacts
     uses: ./.github/workflows/sonarqube.yml
-    secrets: inherit
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     # with: {}  # Add if sonarqube.yml needs inputs (e.g., project-key)
 
   trivy:
