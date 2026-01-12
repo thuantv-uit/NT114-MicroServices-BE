@@ -5,7 +5,7 @@ const createTestApp = () => {
   const app = express();
 
   app.use(express.json());
-  app.use("/users", boardRoutes);
+  app.use("/boards", boardRoutes);
 
   return app;
 };
