@@ -1,6 +1,6 @@
-const { registerUser } = require("../controllers/userController");
-const User = require("../models/userModel");
-const { mockResponse, mockNext } = require("./mockReqRes");
+const { registerUser } = require("../../controllers/userController");
+const User = require("../../models/userModel");
+const { mockResponse, mockNext } = require("../helpers/mockReqRes");
 
 describe("User Controller Integration", () => {
   it("should create user in database", async () => {

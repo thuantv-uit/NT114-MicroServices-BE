@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const { connectDB, disconnectDB } = require("./db");
+const { connectDB, disconnectDB } = require("./helpers/db");
 
 beforeAll(async () => {
   jest.setTimeout(30000); // ⬅️ QUAN TRỌNG

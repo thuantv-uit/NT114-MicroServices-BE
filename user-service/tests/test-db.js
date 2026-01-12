@@ -1,4 +1,4 @@
-const { connectDB } = require("./db");
+const { connectDB } = require("./helpers/db");
 
 (async () => {
   console.log("🔍 Testing MongoDB connection...");
