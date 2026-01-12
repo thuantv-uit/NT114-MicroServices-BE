@@ -10,7 +10,7 @@ jest.mock("../../services/user");
 jest.mock("../../utils/helpers");
 
 describe("Board Controller Integration - createBoard (with mocked user service)", () => {
-  const mockUserId = "507f1f77bcf86cd799439011"; // ObjectId giả hợp lệ
+  const mockUserId = "507f1f77bcf86cd799439011";
   const mockToken = "fake-jwt-token-for-test";
 
   beforeEach(() => {
