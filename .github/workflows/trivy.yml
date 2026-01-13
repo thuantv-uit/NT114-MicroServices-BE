@@ -17,27 +17,28 @@ jobs:
       - name: Parse services input to JSON array
         id: parse
         run: |
+          # Lấy input và ép thành string bằng cách thêm dấu ngoặc kép
           INPUT_RAW="${{ inputs.services }}"
-          echo "Raw input received: $INPUT_RAW (type check)"
+          echo "Raw input received (as string): '$INPUT_RAW'"
 
-          # Nếu input là số (ví dụ 0 hoặc 123), coi như rỗng
-          if [[ "$INPUT_RAW" =~ ^[0-9]+$ ]]; then
-            echo "Input is treated as number → treat as empty"
-            echo "services_json=[]" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          # Xử lý bình thường
-          CLEAN_INPUT=$(echo "$INPUT_RAW" | tr -d '[:space:]')
-          echo "Cleaned input: $CLEAN_INPUT"
-
-          if [ -z "$CLEAN_INPUT" ]; then
+          # Nếu input trống hoặc là số → set rỗng
+          if [ -z "$INPUT_RAW" ] || [[ "$INPUT_RAW" =~ ^[0-9]+$ ]]; then
+            echo "Input is empty or number → treating as no services"
             echo "services_json=[]" >> $GITHUB_OUTPUT
           else
-            # Sử dụng printf để tránh lỗi parse nếu có ký tự lạ
-            JSON_ARRAY=$(printf '%s' "$CLEAN_INPUT" | jq -c 'split(",") | map(select(. != ""))' 2>&1 || echo '[]')
-            echo "services_json=$JSON_ARRAY" >> $GITHUB_OUTPUT
-            echo "Parsed JSON: $JSON_ARRAY"
+            # Xóa khoảng trắng
+            CLEAN_INPUT=$(echo "$INPUT_RAW" | tr -d '[:space:]')
+            echo "Cleaned input: $CLEAN_INPUT"
+
+            # Sử dụng printf để chắc chắn echo string, và jq với -R để raw input
+            JSON_ARRAY=$(printf '%s\n' "$CLEAN_INPUT" | jq -R -c 'split(",") | map(select(. != ""))' 2>&1)
+            if [[ "$JSON_ARRAY" == *"error"* ]]; then
+              echo "jq failed, fallback to empty array"
+              echo "services_json=[]" >> $GITHUB_OUTPUT
+            else
+              echo "services_json=$JSON_ARRAY" >> $GITHUB_OUTPUT
+              echo "Parsed JSON successfully: $JSON_ARRAY"
+            fi
           fi
 
   build-and-scan:
