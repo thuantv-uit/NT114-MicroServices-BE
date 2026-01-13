@@ -5,17 +5,18 @@ on:
     branches: [production]
 
 jobs:
+
+  detect-changes:
+    uses: ./.github/workflows/detect-changes.yml
+
   docker-build-push:
     name: Build & Push Docker Images
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.any_changed == 'true' }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service:
-          - board-service
-          - card-service
-          - column-service
-          - notification-service
-          - user-service
+        service: ${{ fromJson(needs.detect-changes.outputs.services_json) }}
       fail-fast: false
 
     steps:
@@ -23,7 +24,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Login to Docker Hub
-        uses: docker/login-action@5e57cd1
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -31,7 +32,7 @@ jobs:
       - name: Build & Push ${{ matrix.service }}
         run: |
           cd ${{ matrix.service }}
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:latest .
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:${{ github.sha }} .
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:latest
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:${{ github.sha }}
+          docker build -t thuan410/${{ matrix.service }}:latest .
+          docker build -t thuan410/${{ matrix.service }}:${{ github.sha }} .
+          docker push thuan410/${{ matrix.service }}:latest
+          docker push thuan410/${{ matrix.service }}:${{ github.sha }}

@@ -7,45 +7,68 @@ on:
     pull_request:
       branches: [main]
 jobs:
+
+  detect-changes:
+    uses: ./.github/workflows/detect-changes.yml
+
   build-services:
-    name: Build Services
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.any_changed == 'true' }}
     strategy:
       matrix:
-        service:
-          - board-service
-          - card-service
-          - column-service
-          - notification-service
-          - user-service
-      fail-fast: false  # Do not stop if one service fails, to collect logs
+        service: ${{ fromJson(needs.detect-changes.outputs.services_json) }}
+      fail-fast: false
+    name: Build ${{ matrix.service }}
     uses: ./.github/workflows/build-service.yml
     with:
       service-name: ${{ matrix.service }}
       package-lock-path: ${{ matrix.service }}/package-lock.json
-      output-dir: 'dist'  # Optional: pass if need to customize
+      output-dir: 'dist'
 
+  test-services:
+    needs: [detect-changes, build-services]
+    if: ${{ needs.detect-changes.outputs.any_changed == 'true' }}
+    strategy:
+      matrix:
+        service: ${{ fromJson(needs.detect-changes.outputs.services_json) }}
+      fail-fast: false
+    uses: ./.github/workflows/test-service.yml
+    with:
+      service-name: ${{ matrix.service }}
+      package-lock-path: ${{ matrix.service }}/package-lock.json
+  
   sonarqube:
     name: SonarQube Analysis
-    needs: build-services  # Optional: wait for builds if Sonar needs artifacts
+    needs: [detect-changes, build-services, test-services]  # Optional: wait for builds if Sonar needs artifacts
+    if: ${{ needs.detect-changes.outputs.any_changed == 'true' }} # Only run if any service changed
     uses: ./.github/workflows/sonarqube.yml
-    secrets: inherit
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     # with: {}  # Add if sonarqube.yml needs inputs (e.g., project-key)
 
   trivy:
     name: Trivy Vulnerability Scan
-    needs: [build-services, sonarqube]  # Wait for builds and Sonar (skip scan if Sonar fails?)
+    needs: [detect-changes, build-services, test-services, sonarqube]  # Wait for builds and Sonar (skip scan if Sonar fails?)
+    if: ${{ needs.detect-changes.outputs.any_changed == 'true' }} # Only run if any service changed
     uses: ./.github/workflows/trivy.yml
     with:
-      services: 'board-service,card-service,column-service,notification-service,user-service'  # Explicit, or omit to use default
+      services: "${{ needs.detect-changes.outputs.services_list || 'none' }}"  # Pass empty string if no services changed
 
   # Optional: Final summary job (e.g., report overall status)
   summary:
     name: CI Summary
     runs-on: ubuntu-latest
-    needs: [build-services, sonarqube, trivy]
+    needs: [detect-changes ,build-services, test-services, sonarqube, trivy]
     if: always()
     steps:
       - run: |
+          echo "Changed Services:"
+          echo "Board Service: ${{ needs.detect-changes.outputs.board-service }}"
+          echo "Card Service: ${{ needs.detect-changes.outputs.card-service }}"
+          echo "Column Service: ${{ needs.detect-changes.outputs.column-service }}"
+          echo "Notification Service: ${{ needs.detect-changes.outputs.notification-service }}"
+          echo "User Service: ${{ needs.detect-changes.outputs.user-service }}"
+          echo "Any Changed: ${{ needs.detect-changes.outputs.any_changed }}"
           echo "Build: ${{ needs.build-services.result }}"
           echo "Sonar: ${{ needs.sonarqube.result }}"
           echo "Trivy: ${{ needs.trivy.result }}"

@@ -1,0 +1,64 @@
+name: Detect Changed Services
+
+on:
+  workflow_call:
+    outputs:
+      any_changed:
+        description: "True if any service changed"
+        value: ${{ jobs.detect.outputs.any_changed }}
+      services_json:
+        description: "JSON array of changed services"
+        value: ${{ jobs.detect.outputs.services_json }}
+      services_list:
+        description: "Comma-separated list of changed services"
+        value: ${{ jobs.detect.outputs.services_list }}
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read  # Cần cho paths-filter ở PR
+
+    # Định nghĩa job outputs ở đây (từ steps)
+    outputs:
+      any_changed:     ${{ steps.set-outputs.outputs.any_changed }}
+      services_json:   ${{ steps.set-outputs.outputs.services_json }}
+      services_list:   ${{ steps.set-outputs.outputs.services_list }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check changed services
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            board-service: 'board-service/**'
+            card-service: 'card-service/**'
+            column-service: 'column-service/**'
+            notification-service: 'notification-service/**'
+            user-service: 'user-service/**'
+
+      - name: Set outputs based on changes
+        id: set-outputs
+        run: |
+          CHANGED=()
+          [[ "${{ steps.filter.outputs.board-service }}" == "true" ]] && CHANGED+=("board-service")
+          [[ "${{ steps.filter.outputs.card-service }}" == "true" ]] && CHANGED+=("card-service")
+          [[ "${{ steps.filter.outputs.column-service }}" == "true" ]] && CHANGED+=("column-service")
+          [[ "${{ steps.filter.outputs.notification-service }}" == "true" ]] && CHANGED+=("notification-service")
+          [[ "${{ steps.filter.outputs.user-service }}" == "true" ]] && CHANGED+=("user-service")
+
+          # JSON array compact (single line)
+          JSON=$(printf '%s\n' "${CHANGED[@]}" | jq -R . | jq -s -c .)
+          echo "services_json=$JSON" >> $GITHUB_OUTPUT
+
+          # Comma list vẫn ok vì single-line
+          LIST=$(IFS=','; echo "${CHANGED[*]}")
+          echo "services_list=$LIST" >> $GITHUB_OUTPUT
+
+          # any_changed
+          ANY_CHANGED=$([ ${#CHANGED[@]} -gt 0 ] && echo 'true' || echo 'false')
+          echo "any_changed=$ANY_CHANGED" >> $GITHUB_OUTPUT
