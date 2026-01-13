@@ -51,11 +51,11 @@ jobs:
           [[ "${{ steps.filter.outputs.notification-service }}" == "true" ]] && CHANGED+=("notification-service")
           [[ "${{ steps.filter.outputs.user-service }}" == "true" ]] && CHANGED+=("user-service")
 
-          # JSON array
-          JSON=$(printf '%s\n' "${CHANGED[@]}" | jq -R . | jq -s .)
+          # JSON array compact (single line)
+          JSON=$(printf '%s\n' "${CHANGED[@]}" | jq -R . | jq -s -c .)
           echo "services_json=$JSON" >> $GITHUB_OUTPUT
 
-          # Comma list
+          # Comma list vẫn ok vì single-line
           LIST=$(IFS=','; echo "${CHANGED[*]}")
           echo "services_list=$LIST" >> $GITHUB_OUTPUT
 
