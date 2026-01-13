@@ -17,14 +17,28 @@ jobs:
       - name: Parse services input to JSON array
         id: parse
         run: |
-          CLEAN_INPUT=$(echo "${{ inputs.services }}" | tr -d '[:space:]')
+          INPUT_RAW="${{ inputs.services }}"
+          echo "Raw input received: $INPUT_RAW (type check)"
+
+          # Nếu input là số (ví dụ 0 hoặc 123), coi như rỗng
+          if [[ "$INPUT_RAW" =~ ^[0-9]+$ ]]; then
+            echo "Input is treated as number → treat as empty"
+            echo "services_json=[]" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Xử lý bình thường
+          CLEAN_INPUT=$(echo "$INPUT_RAW" | tr -d '[:space:]')
+          echo "Cleaned input: $CLEAN_INPUT"
+
           if [ -z "$CLEAN_INPUT" ]; then
             echo "services_json=[]" >> $GITHUB_OUTPUT
           else
-            JSON_ARRAY=$(echo "$CLEAN_INPUT" | jq -c 'split(",") | map(select(. != ""))')
+            # Sử dụng printf để tránh lỗi parse nếu có ký tự lạ
+            JSON_ARRAY=$(printf '%s' "$CLEAN_INPUT" | jq -c 'split(",") | map(select(. != ""))' 2>&1 || echo '[]')
             echo "services_json=$JSON_ARRAY" >> $GITHUB_OUTPUT
+            echo "Parsed JSON: $JSON_ARRAY"
           fi
-          echo "Parsed input: ${{ inputs.services }} → ${{ steps.parse.outputs.services_json }}"
 
   build-and-scan:
     needs: prepare-matrix
