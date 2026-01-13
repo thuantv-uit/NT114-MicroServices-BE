@@ -40,7 +40,7 @@ jobs:
     if: ${{ needs.detect-changes.outputs.any_changed == 'true' }} # Only run if any service changed
     uses: ./.github/workflows/trivy.yml
     with:
-      services: ${{ needs.detect-changes.outputs.services_list || '' }}  # Pass empty string if no services changed
+      services: "${{ needs.detect-changes.outputs.services_list || '' }}"  # Pass empty string if no services changed
 
   # Optional: Final summary job (e.g., report overall status)
   summary:
