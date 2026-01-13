@@ -1,40 +1,42 @@
 name: Scan Pipeline
 
 on:
-  workflow_call:  # Designed to be called from another workflow (e.g., ci.yml)
+  workflow_call:
     inputs:
       services:
-        description: 'List of services to scan (comma-separated, default: all five)'
+        description: 'Comma-separated list of services to scan (e.g. board-service,card-service). Nếu rỗng thì skip (nhưng caller sẽ skip job nếu không thay đổi).'
         required: false
         type: string
-        default: 'board-service,card-service,column-service,notification-service,user-service'
 
 jobs:
-  build-and-scan:
-    name: Build and Scan Docker Images with Trivy
+  prepare-matrix:
     runs-on: ubuntu-latest
     outputs:
-      datetime: ${{ steps.set-datetime.outputs.datetime }}
-
-    strategy:
-      matrix:
-        service: ${{ fromJson(steps.parse-services.outputs.services_json) }}
-      fail-fast: false
-
+      services_json: ${{ steps.parse.outputs.services_json }}
     steps:
-      - name: Parse services input to matrix
-        id: parse-services
+      - name: Parse services input to JSON array
+        id: parse
         run: |
-          # No need for fallback anymore because if in caller already skips job if empty
           CLEAN_INPUT=$(echo "${{ inputs.services }}" | tr -d '[:space:]')
           if [ -z "$CLEAN_INPUT" ]; then
-            # This case is rare because the caller skips, but to be safe: set the matrix empty (job will fail slightly if triggered)
             echo "services_json=[]" >> $GITHUB_OUTPUT
           else
             JSON_ARRAY=$(echo "$CLEAN_INPUT" | jq -c 'split(",") | map(select(. != ""))')
             echo "services_json=$JSON_ARRAY" >> $GITHUB_OUTPUT
           fi
-          echo "Parsed: ${{ inputs.services }} → ${{ steps.parse-services.outputs.services_json }}"
+          echo "Parsed input: ${{ inputs.services }} → ${{ steps.parse.outputs.services_json }}"
+
+  build-and-scan:
+    needs: prepare-matrix
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: ${{ fromJson(needs.prepare-matrix.outputs.services_json) }}
+      fail-fast: false
+
+    name: Build & Scan ${{ matrix.service }}
+    outputs:
+      datetime: ${{ steps.set-datetime.outputs.datetime }}
 
     steps:
       - name: Checkout repository
@@ -57,21 +59,21 @@ jobs:
         run: mkdir -p trivy-results
 
       - name: Run Trivy vulnerability scanner
-        id: trivy-scan  # ID để reference output sau
-        uses: aquasecurity/trivy-action@master  # Update lên latest (tắt notice tự động)
+        id: trivy-scan
+        uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ matrix.service }}:${{ steps.set-datetime.outputs.datetime }}  # Bỏ quotes thừa
+          image-ref: ${{ matrix.service }}:${{ steps.set-datetime.outputs.datetime }}
           format: 'json'
           output: 'trivy-results/scan-results-${{ matrix.service }}-${{ steps.set-datetime.outputs.datetime }}.json'
           ignore-unfixed: true
           vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH'  # Chỉ report mức cao, ignore LOW/MEDIUM để log sạch
-          exit-code: '0'  # QUAN TRỌNG: Luôn pass, không fail dù có vulns
+          severity: 'CRITICAL,HIGH'
+          exit-code: '0'
           hide-progress: false
-          skip-version-check: true  # Tắt notice version update
+          skip-version-check: true
 
-      - name: Summary Trivy results for ${{ matrix.service }}  # MỚI: Parse và log tóm tắt vulns
-        if: always()  # Chạy dù Trivy fail (nhưng giờ không fail nữa)
+      - name: Summary Trivy results for ${{ matrix.service }}
+        if: always()
         run: |
           OUTPUT_FILE="trivy-results/scan-results-${{ matrix.service }}-${{ steps.set-datetime.outputs.datetime }}.json"
           if [ -f "$OUTPUT_FILE" ]; then
@@ -88,15 +90,11 @@ jobs:
             else
               echo "- ✅ No high-severity issues!" >> $GITHUB_STEP_SUMMARY
             fi
-            echo "---" >> $GITHUB_STEP_SUMMARY  # Separator cho summary
-            # Log chi tiết vào console (optional, để debug)
-            echo "Full summary logged to GitHub Summary tab. Download artifact for full JSON."
+            echo "---" >> $GITHUB_STEP_SUMMARY
           else
-            echo "❌ No scan results file found for ${{ matrix.service }}."
+            echo "❌ No scan results file found for ${{ matrix.service }}." >> $GITHUB_STEP_SUMMARY
           fi
         shell: bash
-        env:
-          OUTPUT_FILE: ${{ steps.trivy-scan.outputs.output }}  # Nếu action có output, nhưng dùng trực tiếp
 
       - name: Verify scan results file for ${{ matrix.service }}
         run: |
@@ -106,17 +104,15 @@ jobs:
             echo "✅ File exists: $(wc -l < $OUTPUT_FILE) lines"
           else
             echo "⚠️ Warning: Scan results file not found! Check Trivy logs."
-            # Không exit 1 nữa, để pass
           fi
 
       - name: Upload scan results as artifact for ${{ matrix.service }}
-        if: always()  # Upload dù có lỗi
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: trivy-scan-results-${{ matrix.service }}-${{ steps.set-datetime.outputs.datetime }}
           path: trivy-results/scan-results-${{ matrix.service }}-${{ steps.set-datetime.outputs.datetime }}.json
 
-      # Thêm cleanup Docker image để tiết kiệm space (optional)
       - name: Cleanup Docker image
         if: always()
         run: docker rmi ${{ matrix.service }}:${{ steps.set-datetime.outputs.datetime }} || true
