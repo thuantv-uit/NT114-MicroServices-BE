@@ -1,0 +1,59 @@
+name: Run Unit Tests for Service (Jest + Coverage)
+
+on:
+  workflow_call:
+    inputs:
+      service-name:
+        description: 'Tên service (ví dụ: board-service, user-service)'
+        required: true
+        type: string
+      package-lock-path:
+        description: 'Đường dẫn package-lock.json (ví dụ: board-service/package-lock.json)'
+        required: true
+        type: string
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x, 22.x]  # Test trên nhiều phiên bản Node
+      fail-fast: false
+
+    name: Test ${{ inputs.service-name }} (Node ${{ matrix.node-version }})
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: ${{ inputs.package-lock-path }}
+
+      - name: Install dependencies
+        working-directory: ./${{ inputs.service-name }}
+        run: npm ci
+
+      # Start MongoDB test DB from root using make
+      - name: Start MongoDB Test DB
+        run: make db_test_up  # Chạy trực tiếp từ root
+
+      - name: Run Jest with Coverage
+        working-directory: ./${{ inputs.service-name }}
+        run: npm run test:int
+
+      - name: Upload coverage report
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ inputs.service-name }}-node-${{ matrix.node-version }}
+          path: ./${{ inputs.service-name }}/coverage/
+          retention-days: 7
+
+      # Cleanup MongoDB test DB from root, chạy dù test fail
+      - name: Stop MongoDB Test DB
+        if: always()
+        run: make db_test_down  # Chạy trực tiếp từ root

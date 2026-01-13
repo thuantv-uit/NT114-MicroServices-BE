@@ -24,10 +24,22 @@ jobs:
       service-name: ${{ matrix.service }}
       package-lock-path: ${{ matrix.service }}/package-lock.json
       output-dir: 'dist'
+
+  test-services:
+    needs: [detect-changes, build-services]
+    if: ${{ needs.detect-changes.outputs.any_changed == 'true' }}
+    strategy:
+      matrix:
+        service: ${{ fromJson(needs.detect-changes.outputs.services_json) }}
+      fail-fast: false
+    uses: ./.github/workflows/test-service.yml
+    with:
+      service-name: ${{ matrix.service }}
+      package-lock-path: ${{ matrix.service }}/package-lock.json
   
   sonarqube:
     name: SonarQube Analysis
-    needs: [detect-changes, build-services]  # Optional: wait for builds if Sonar needs artifacts
+    needs: [detect-changes, build-services, test-services]  # Optional: wait for builds if Sonar needs artifacts
     if: ${{ needs.detect-changes.outputs.any_changed == 'true' }} # Only run if any service changed
     uses: ./.github/workflows/sonarqube.yml
     secrets:
@@ -36,7 +48,7 @@ jobs:
 
   trivy:
     name: Trivy Vulnerability Scan
-    needs: [detect-changes, build-services, sonarqube]  # Wait for builds and Sonar (skip scan if Sonar fails?)
+    needs: [detect-changes, build-services, test-services, sonarqube]  # Wait for builds and Sonar (skip scan if Sonar fails?)
     if: ${{ needs.detect-changes.outputs.any_changed == 'true' }} # Only run if any service changed
     uses: ./.github/workflows/trivy.yml
     with:
@@ -46,7 +58,7 @@ jobs:
   summary:
     name: CI Summary
     runs-on: ubuntu-latest
-    needs: [detect-changes ,build-services, sonarqube, trivy]
+    needs: [detect-changes ,build-services, test-services, sonarqube, trivy]
     if: always()
     steps:
       - run: |
