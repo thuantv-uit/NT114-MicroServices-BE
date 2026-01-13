@@ -1,0 +1,49 @@
+name: Detect Changed Services
+
+on:
+  workflow_call:
+    outputs:
+      board-service:    ${{ jobs.detect.outputs.board-service }}
+      card-service:     ${{ jobs.detect.outputs.card-service }}
+      column-service:   ${{ jobs.detect.outputs.column-service }}
+      notification-service: ${{ jobs.detect.outputs.notification-service }}
+      user-service:     ${{ jobs.detect.outputs.user-service }}
+      any_changed:      ${{ jobs.detect.outputs.any_changed }}  # true if there is at least 1 service change
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read  # Need PR to filter correctly
+    outputs:
+      board-service:    ${{ steps.filter.outputs.board-service }}
+      card-service:     ${{ steps.filter.outputs.card-service }}
+      column-service:   ${{ steps.filter.outputs.column-service }}
+      notification-service: ${{ steps.filter.outputs.notification-service }}
+      user-service:     ${{ steps.filter.outputs.user-service }}
+      any_changed:      ${{ steps.filter.outputs.any_changed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check changed services
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            board-service:
+              - 'board-service/**'
+            card-service:
+              - 'card-service/**'
+            column-service:
+              - 'column-service/**'
+            notification-service:
+              - 'notification-service/**'
+            user-service:
+              - 'user-service/**'
+            # Optional: If changing a common file, set any_changed = true
+            # shared:
+            #   - 'shared/**'
+            #   - 'Dockerfile'
+            #   - '.github/workflows/**'
