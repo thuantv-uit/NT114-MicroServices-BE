@@ -22,31 +22,6 @@ const authMiddleware = (req, res, next) => {
   }
 };
 
-// const createColumn = async (req, res, next) => {
-//   try {
-//     const { title, boardId, backgroundColor } = req.body;
-//     const token = extractToken(req);
-//     if (!isValidObjectId(boardId)) {
-//       throwError(ERROR_MESSAGES.INVALID_ID, STATUS_CODES.BAD_REQUEST);
-//     }
-//     const { board } = await validateUserAndBoardAccess(boardId, req.user.id, token);
-//     // Chỉ board owner được tạo column
-//     if (board.userId.toString() !== req.user.id) {
-//       throwError(ERROR_MESSAGES.NOT_BOARD_OWNER, STATUS_CODES.FORBIDDEN);
-//     }
-
-//     const column = new Column({ title, boardId, backgroundColor });
-//     await column.save();
-
-//     const newColumnOrderIds = [...(board.columnOrderIds || []), column._id.toString()];
-//     await updateBoardColumnOrder(boardId, newColumnOrderIds, token);
-
-//     res.status(STATUS_CODES.CREATED).json(column);
-//   } catch (error) {
-//     next(error);
-//   }
-// };
-
 const createColumn = async (req, res, next) => {
   try {
     const { title, boardId, backgroundColor } = req.body;
