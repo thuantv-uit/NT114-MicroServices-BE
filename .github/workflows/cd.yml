@@ -5,17 +5,18 @@ on:
     branches: [production]
 
 jobs:
+
+  detect-changes:
+    uses: ./.github/workflows/detect-changes.yml
+
   docker-build-push:
     name: Build & Push Docker Images
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.any_changed == 'true' }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service:
-          - board-service
-          - card-service
-          - column-service
-          - notification-service
-          - user-service
+        service: ${{ fromJson(needs.detect-changes.outputs.services_json) }}
       fail-fast: false
 
     steps:
