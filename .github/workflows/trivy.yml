@@ -18,12 +18,23 @@ jobs:
 
     strategy:
       matrix:
-        service: 
-          - board-service
-          - card-service
-          - column-service
-          - notification-service
-          - user-service
+        service: ${{ fromJson(steps.parse-services.outputs.services_json) }}
+      fail-fast: false
+
+    steps:
+      - name: Parse services input to matrix
+        id: parse-services
+        run: |
+          # No need for fallback anymore because if in caller already skips job if empty
+          CLEAN_INPUT=$(echo "${{ inputs.services }}" | tr -d '[:space:]')
+          if [ -z "$CLEAN_INPUT" ]; then
+            # This case is rare because the caller skips, but to be safe: set the matrix empty (job will fail slightly if triggered)
+            echo "services_json=[]" >> $GITHUB_OUTPUT
+          else
+            JSON_ARRAY=$(echo "$CLEAN_INPUT" | jq -c 'split(",") | map(select(. != ""))')
+            echo "services_json=$JSON_ARRAY" >> $GITHUB_OUTPUT
+          fi
+          echo "Parsed: ${{ inputs.services }} → ${{ steps.parse-services.outputs.services_json }}"
 
     steps:
       - name: Checkout repository

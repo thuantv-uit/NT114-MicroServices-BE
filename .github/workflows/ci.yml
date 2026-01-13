@@ -36,10 +36,11 @@ jobs:
 
   trivy:
     name: Trivy Vulnerability Scan
-    needs: [build-services, sonarqube]  # Wait for builds and Sonar (skip scan if Sonar fails?)
+    needs: [detect-changes, build-services, sonarqube]  # Wait for builds and Sonar (skip scan if Sonar fails?)
+    if: ${{ needs.detect-changes.outputs.any_changed == 'true' }} # Only run if any service changed
     uses: ./.github/workflows/trivy.yml
     with:
-      services: 'board-service,card-service,column-service,notification-service,user-service'  # Explicit, or omit to use default
+      services: ${{ needs.detect-changes.outputs.services_list || '' }}  # Pass empty string if no services changed
 
   # Optional: Final summary job (e.g., report overall status)
   summary:
