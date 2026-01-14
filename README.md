@@ -23,7 +23,7 @@ Each service is implemented using Node.js and communicates through RESTful APIs,
 <p align="center"> <img src="./screenshots/test-column-card.png" alt="Column and Card Tests" width="800"/> </p>
 
 ### ▶️ Server Execution Demo
-<p align="center"> <img src="./screenshots/run-server1.png" alt="Backend Services Running" width="270"/> <img src="./screenshots/test-browers.png" alt="Browser API Testing" width="270"/> </p> <img src="./screenshots/test-postman.png" alt="Postman API Testing" width="270"/>
+<p align="center"> <img src="./screenshots/run-server1.png" alt="Backend Services Running" width="850"/> </p> <p align="center"> <img src="./screenshots/test-browers.png" alt="Browser API Validation" width="850"/> </p> <p align="center"> <img src="./screenshots/test-postman.png" alt="Postman API Validation" width="850"/> </p>
 
 ### 🔁 CI/CD Demo
 #### 🔍 Continuous Integration (CI)
