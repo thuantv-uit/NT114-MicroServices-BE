@@ -11,6 +11,37 @@ Each service is implemented using Node.js and communicates through RESTful APIs,
 
 ---
 
+## 📸 Backend Demo
+### 🧪 Unit Testing Demo (Jest)
+#### 🗄️ Test Database Setup
+<p align="center"> <img src="./screenshots/run-test-db.png" alt="Invitation Service Test" width="800"/> </p>
+
+#### 👤 User & 📋 Board Service Tests
+<p align="center"> <img src="./screenshots/test-user-board.png" alt="User and Board Tests" width="800"/> </p>
+
+#### 🧱 Column & 📝 Card Service Tests
+<p align="center"> <img src="./screenshots/test-column-card.png" alt="Column and Card Tests" width="800"/> </p>
+
+### ▶️ Server Execution Demo
+<p align="center"> <img src="./screenshots/run-server.png" alt="Backend Services Running" width="800"/> </p>
+
+### 🔁 CI/CD Demo
+#### 🔍 Continuous Integration (CI)
+**1. 🧭 CI Workflow Overview**
+<p align="center"> <img src="./screenshots/overview-ci.png" alt="CI Workflow" width="850"/> </p>
+
+**2. 🧪 CI Detail – Testing & Detect Changes**
+<p align="center"> <img src="./screenshots/unit-test.png" alt="CI Test and SonarQube" width="850"/> </p> <p align="center"> <img src="./screenshots/detect-change.png" alt="CI Trivy Scan" width="850"/> </p>
+
+#### 🚀 Continuous Deployment (CD)
+**1. 🧭 CD Workflow Overview**
+<p align="center"> <img src="./screenshots/overview-cd.png" alt="CD Workflow" width="850"/> </p>
+
+**2. 🐳 CD Detail – Build & Push Docker Images**
+<p align="center"> <img src="./screenshots/build-and-push.png" alt="CD Build and Push Docker Image" width="850"/> </p>
+
+---
+
 ## 🧱 Architecture Overview
 The backend is composed of independent microservices, each responsible for a specific domain.
 Every service runs on its own port and can be developed, tested, and deployed independently.
