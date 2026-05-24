@@ -202,38 +202,44 @@ const getLatestBoardId = async (req, res, next) => {
 
 const updateBoardMemberIds = async (req, res, next) => {
   try {
+    // console.log('req.body:', JSON.stringify(req.body));
+    
     const { id } = req.params;
     const { memberIds } = req.body;
     const token = extractToken(req);
 
-    // Kiểm tra ID hợp lệ
     if (!isValidObjectId(id)) {
       throwError(ERROR_MESSAGES.INVALID_ID, STATUS_CODES.BAD_REQUEST);
     }
 
-    // Kiểm tra user tồn tại
+    // Chỉ verify token hợp lệ, không check quyền board
     const user = await checkUserExists(req.user.id, token);
     if (!user) {
       throwError(ERROR_MESSAGES.USER_NOT_FOUND, STATUS_CODES.NOT_FOUND);
     }
 
-    // Kiểm tra board tồn tại
     const board = await Board.findById(id);
     if (!board) {
       throwError(ERROR_MESSAGES.BOARD_NOT_FOUND, STATUS_CODES.NOT_FOUND);
     }
 
-    // Thêm mới memberIds vào mảng hiện tại, loại bỏ trùng lặp
     const newMemberIds = Array.isArray(memberIds) ? memberIds : [memberIds];
-    board.memberIds = [...new Set([...board.memberIds, ...newMemberIds])];
+    const merged = [...board.memberIds];
+    for (const newMember of newMemberIds) {
+      const exists = merged.some(
+        m => m.userId.toString() === newMember.userId.toString()
+      );
+      if (!exists) {
+        merged.push(newMember);
+      }
+    }
+    board.memberIds = merged;
     board.updatedAt = Date.now();
 
-    // Lưu board
     await board.save();
-
-    // Trả về board đã cập nhật
     res.json(board);
   } catch (error) {
+    console.error('updateBoardMemberIds error:', error);
     next(error);
   }
 };

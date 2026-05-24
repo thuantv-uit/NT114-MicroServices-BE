@@ -21,14 +21,20 @@ const getBoardById = async (boardId, userId, token) => {
 
 const updateMemberIds = async (boardId, memberIds, token) => {
   try {
+    const url = `${BOARD_SERVICE_URL}/api/boards/${boardId}/members`;
+    // console.log('updateMemberIds URL:', url);
+    // console.log('updateMemberIds payload:', JSON.stringify({ memberIds }));
+    
     const response = await axios.post(
-      `${BOARD_SERVICE_URL}/api/boards/${boardId}/members`,
+      url,
       { memberIds },
       { headers: { Authorization: `Bearer ${token}` } }
     );
-    console.log('Member IDs updated successfully:', response.data);
+    // console.log('updateMemberIds response:', response.data);
     return response.data;
   } catch (error) {
+    // console.error('updateMemberIds axios error:', error.response?.status, error.response?.data);
+    // console.error('updateMemberIds full error:', error.message);
     if (error.response?.status === 404) {
       throwError(ERROR_MESSAGES.BOARD_NOT_FOUND, STATUS_CODES.NOT_FOUND);
     }
