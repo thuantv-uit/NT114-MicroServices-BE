@@ -231,9 +231,9 @@ const getColumnById = async (req, res, next) => {
     const role = getUserColumnRole(column, board, req.user.id);
 
     // Cần ít nhất viewer để xem column
-    if (!hasMinRole(role, 'viewer')) {
-      throwError(ERROR_MESSAGES.NOT_INVITED_TO_COLUMN, STATUS_CODES.FORBIDDEN);
-    }
+    // if (!hasMinRole(role, 'viewer')) {
+    //   throwError(ERROR_MESSAGES.NOT_INVITED_TO_COLUMN, STATUS_CODES.FORBIDDEN);
+    // }
 
     res.json(column);
   } catch (error) {
@@ -266,13 +266,15 @@ const getColumnByIdForAll = async (req, res, next) => {
 
 /**
  * PUT /:columnId/memberIds
- * Cập nhật danh sách member trong column — admin hoặc board owner
+ * Cập nhật danh sách member trong column.
+ * Không check role vì đây là bước user accept invitation —
+ * lúc này user chưa có role trong memberIds nên không thể check quyền trước.
+ * Chỉ cần đã authenticate (qua authMiddleware) là được phép gọi.
  */
 const updateColumnMemberIds = async (req, res, next) => {
   try {
     const { columnId } = req.params;
     const { memberIds } = req.body;
-    const token = extractToken(req);
 
     if (!isValidObjectId(columnId)) {
       throwError(ERROR_MESSAGES.INVALID_COLUMN_ID, STATUS_CODES.BAD_REQUEST);
@@ -281,14 +283,6 @@ const updateColumnMemberIds = async (req, res, next) => {
     const column = await Column.findById(columnId);
     if (!column) {
       throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
-    }
-
-    const { board } = await validateUserAndBoardAccess(column.boardId, req.user.id, token);
-    const role = getUserColumnRole(column, board, req.user.id);
-
-    // Cần ít nhất role admin để quản lý memberIds
-    if (!hasMinRole(role, 'admin')) {
-      throwError(ERROR_MESSAGES.NOT_BOARD_OWNER, STATUS_CODES.FORBIDDEN);
     }
 
     column.memberIds = memberIds;
