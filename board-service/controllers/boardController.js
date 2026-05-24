@@ -94,14 +94,12 @@ const getBoards = async (req, res, next) => {
     // Lấy boards mà user là owner
     const ownedBoards = await Board.find({ userId: req.user.id });
 
-    // Lấy boards mà user được mời và đã accepted (bất kể role)
-    const invitations = await checkBoardInvitation(null, req.user.id, token);
-    const invitedBoardIds = invitations ? invitations.map(inv => inv.boardId.toString()) : [];
-    const invitedBoards = await Board.find({ _id: { $in: invitedBoardIds } });
+    // Lấy boards mà user có trong memberIds (bất kể role)
+    const memberBoards = await Board.find({ 'memberIds.userId': req.user.id });
 
     // Gộp, loại bỏ trùng lặp
     const boards = [...ownedBoards];
-    invitedBoards.forEach(board => {
+    memberBoards.forEach(board => {
       if (!boards.some(owned => owned._id.toString() === board._id.toString())) {
         boards.push(board);
       }
