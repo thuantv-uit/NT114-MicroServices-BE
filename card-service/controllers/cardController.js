@@ -145,7 +145,7 @@ const getCardById = async (req, res, next) => {
     const { id } = req.params;
     const token = extractToken(req);
 
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    if (!isValidObjectId(id)) {
       throwError(ERROR_MESSAGES.INVALID_CARD_ID, STATUS_CODES.BAD_REQUEST);
     }
 
