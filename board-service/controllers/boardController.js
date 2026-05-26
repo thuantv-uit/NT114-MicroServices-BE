@@ -251,6 +251,47 @@ const updateBoardMemberIds = async (req, res, next) => {
   }
 };
 
+const getTemplateBoards = async (req, res, next) => {
+  try {
+    const templates = await Board.find({ type: 'template' })
+      .select('title description backgroundColor backgroundImage columnOrderIds');
+    res.json(templates);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const createBoardFromTemplate = async (req, res, next) => {
+  try {
+    const { id } = req.params; // templateId
+    const { title } = req.body;
+    const token = extractToken(req);
+
+    const user = await checkUserExists(req.user.id, token);
+    if (!user) throwError(ERROR_MESSAGES.USER_NOT_FOUND, STATUS_CODES.NOT_FOUND);
+
+    const template = await Board.findOne({ _id: id, type: 'template' });
+    if (!template) throwError('Template not found', STATUS_CODES.NOT_FOUND);
+
+    // Clone board mới từ template
+    const newBoard = new Board({
+      title: title || `Copy of ${template.title}`,
+      description: template.description,
+      backgroundColor: template.backgroundColor,
+      backgroundImage: template.backgroundImage,
+      userId: req.user.id,
+      memberIds: [],
+      type: 'private', // board clone luôn là private
+      // columnOrderIds sẽ được cập nhật sau khi clone columns/cards xong
+    });
+
+    await newBoard.save();
+    res.status(STATUS_CODES.CREATED).json(newBoard);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   authMiddleware,
   createBoard,
@@ -261,4 +302,6 @@ module.exports = {
   deleteBoard,
   getLatestBoardId,
   updateBoardMemberIds,
+  getTemplateBoards,
+  createBoardFromTemplate
 };

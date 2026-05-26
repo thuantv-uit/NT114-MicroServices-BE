@@ -10,7 +10,9 @@ const {
   authMiddleware,
   allUserGetBoard,
   getLatestBoardId,
-  updateBoardMemberIds
+  updateBoardMemberIds,
+  getTemplateBoards,
+  createBoardFromTemplate
 } = require('../controllers/boardController');
 const validate = require('../middleware/validate');
 const errorHandler = require('../middleware/errorHandler');
@@ -25,6 +27,8 @@ router.get('/list', getBoards);
 router.get('/latest', getLatestBoardId);
 router.get('/:id', getBoardById);
 router.get('/all/:id', allUserGetBoard);
+router.get('/templates/list', getTemplateBoards);
+router.post('/templates/:id', createBoardFromTemplate);
 router.put('/:id', validate(updateBoardSchema), upload.single('backgroundImage'), updateBoard);
 router.post('/:id/members', validate(updateMemberIdsSchema), updateBoardMemberIds);
 router.delete('/:id', deleteBoard);
