@@ -295,6 +295,63 @@ const updateColumnMemberIds = async (req, res, next) => {
   }
 };
 
+const getTemplateBoards = async (req, res, next) => {
+  try {
+    const token = extractToken(req);
+    const user = await checkUserExists(req.user.id, token);
+    if (!user) throwError(ERROR_MESSAGES.USER_NOT_FOUND, STATUS_CODES.NOT_FOUND);
+
+    const templates = await Board.find({ type: 'template' })
+      .select('title description backgroundColor backgroundImage category columnOrderIds');
+
+    res.json(templates);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const createBoardFromTemplate = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { title } = req.body;
+    const token = extractToken(req);
+
+    const user = await checkUserExists(req.user.id, token);
+    if (!user) throwError(ERROR_MESSAGES.USER_NOT_FOUND, STATUS_CODES.NOT_FOUND);
+
+    const template = await Board.findOne({ _id: id, type: 'template' });
+    if (!template) throwError('Template not found', STATUS_CODES.NOT_FOUND);
+
+    // Tạo board mới
+    const newBoard = new Board({
+      title: title || `Copy of ${template.title}`,
+      description: template.description,
+      backgroundColor: template.backgroundColor,
+      backgroundImage: template.backgroundImage,
+      userId: req.user.id,
+      memberIds: [],
+      columnOrderIds: [],
+      type: 'private',
+    });
+    await newBoard.save();
+
+    // Clone columns — gọi service
+    const clonedColumnIds = await cloneColumnsFromTemplate(
+      template._id,
+      template.columnOrderIds,
+      newBoard._id,
+      token
+    );
+
+    newBoard.columnOrderIds = clonedColumnIds;
+    await newBoard.save();
+
+    res.status(STATUS_CODES.CREATED).json(newBoard);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   authMiddleware,
   createColumn,
@@ -303,5 +360,7 @@ module.exports = {
   getColumnsByBoard,
   getColumnById,
   getColumnByIdForAll,
-  updateColumnMemberIds
+  updateColumnMemberIds,
+  getTemplateBoards,
+  createBoardFromTemplate,
 };

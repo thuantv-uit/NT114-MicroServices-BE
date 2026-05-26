@@ -14,9 +14,9 @@ const boardSchema = new mongoose.Schema({
     role: { type: String, required: true, enum: ['admin', 'member', 'viewer'] }
   }],
   type: { 
-  type: String, 
-    enum: ['private', 'public', 'template'], 
-    default: 'private' 
+    type: String, 
+      enum: ['private', 'public', 'template'], 
+      default: 'private'
   },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
