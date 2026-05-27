@@ -19,4 +19,16 @@ const getBoardById = async (boardId, userId, token) => {
   }
 };
 
-module.exports = { getBoardById };
+const getAllBoardById = async (boardId, token) => {
+  try {
+    const response = await axios.get(`${BOARD_SERVICE_URL}/api/boards/all/${boardId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.data;
+  } catch (error) {
+    if (error.response?.status === 404) return null;
+    throwError(ERROR_MESSAGES.BOARD_SERVICE_ERROR, STATUS_CODES.INTERNAL_SERVER_ERROR);
+  }
+};
+
+module.exports = { getBoardById, getAllBoardById };

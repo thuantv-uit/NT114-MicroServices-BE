@@ -1,30 +1,19 @@
 const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 const Column = require('../models/columnModel');
+const { updateBoardColumnOrder, getAllBoardById } = require('../services/board');
 const { extractToken, throwError, isValidObjectId } = require('../utils/helpers');
-const { updateBoardColumnOrder } = require('../services/board');
 const { validateUserAndBoardAccess } = require('../utils/permissions');
 const { STATUS_CODES, ERROR_MESSAGES } = require('../utils/constants');
 
 // ─── Role Helpers ────────────────────────────────────────────────────────────
 
-/**
- * Lấy role của user trong column.
- * Trả về 'owner' nếu là board owner, 'admin' | 'member' | 'viewer' nếu có trong memberIds, null nếu không có quyền.
- */
 const getUserColumnRole = (column, board, userId) => {
   if (board.userId.toString() === userId) return 'owner';
-
-  const member = column.memberIds.find(
-    m => m.userId.toString() === userId
-  );
+  const member = column.memberIds.find(m => m.userId.toString() === userId);
   return member ? member.role : null;
 };
 
-/**
- * Kiểm tra role có đủ quyền không theo thứ tự phân cấp:
- * owner > admin > member > viewer
- */
 const ROLE_HIERARCHY = { owner: 4, admin: 3, member: 2, viewer: 1 };
 
 const hasMinRole = (role, minRole) => {
@@ -53,6 +42,7 @@ const authMiddleware = (req, res, next) => {
 /**
  * POST /
  * Tạo column mới — chỉ board owner
+ * ✅ Không cho phép tạo column trong template board
  */
 const createColumn = async (req, res, next) => {
   try {
@@ -64,6 +54,10 @@ const createColumn = async (req, res, next) => {
     }
 
     const { board } = await validateUserAndBoardAccess(boardId, req.user.id, token);
+
+    if (board.type === 'template') {
+      throwError('Cannot create columns in a template board', STATUS_CODES.FORBIDDEN);
+    }
 
     if (board.userId.toString() !== req.user.id) {
       throwError(ERROR_MESSAGES.NOT_BOARD_OWNER, STATUS_CODES.FORBIDDEN);
@@ -83,7 +77,8 @@ const createColumn = async (req, res, next) => {
 
 /**
  * PUT /:columnId
- * Cập nhật column (title, backgroundColor, cardOrderIds) — member trở lên
+ * Cập nhật column — member trở lên
+ * ✅ Không cho phép sửa column trong template board
  */
 const updateColumn = async (req, res, next) => {
   try {
@@ -96,19 +91,19 @@ const updateColumn = async (req, res, next) => {
     }
 
     const column = await Column.findById(columnId);
-    if (!column) {
-      throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
-    }
+    if (!column) throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
 
     const { board } = await validateUserAndBoardAccess(column.boardId, req.user.id, token);
-    const role = getUserColumnRole(column, board, req.user.id);
 
-    // Cần ít nhất role member để edit column
+    if (board.type === 'template') {
+      throwError('Cannot update columns in a template board', STATUS_CODES.FORBIDDEN);
+    }
+
+    const role = getUserColumnRole(column, board, req.user.id);
     if (!hasMinRole(role, 'member')) {
       throwError(ERROR_MESSAGES.NOT_INVITED_TO_COLUMN, STATUS_CODES.FORBIDDEN);
     }
 
-    // Validate cardOrderIds nếu được gửi
     if (cardOrderIds !== undefined) {
       if (!Array.isArray(cardOrderIds)) {
         throwError('cardOrderIds phải là một mảng', STATUS_CODES.BAD_REQUEST);
@@ -135,6 +130,7 @@ const updateColumn = async (req, res, next) => {
 /**
  * DELETE /:columnId
  * Xóa column — admin hoặc board owner
+ * ✅ Không cho phép xóa column trong template board
  */
 const deleteColumn = async (req, res, next) => {
   try {
@@ -146,14 +142,15 @@ const deleteColumn = async (req, res, next) => {
     }
 
     const column = await Column.findById(columnId);
-    if (!column) {
-      throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
-    }
+    if (!column) throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
 
     const { board } = await validateUserAndBoardAccess(column.boardId, req.user.id, token);
-    const role = getUserColumnRole(column, board, req.user.id);
 
-    // Cần ít nhất role admin để xóa column
+    if (board.type === 'template') {
+      throwError('Cannot delete columns in a template board', STATUS_CODES.FORBIDDEN);
+    }
+
+    const role = getUserColumnRole(column, board, req.user.id);
     if (!hasMinRole(role, 'admin')) {
       throwError(ERROR_MESSAGES.NOT_BOARD_OWNER, STATUS_CODES.FORBIDDEN);
     }
@@ -171,9 +168,8 @@ const deleteColumn = async (req, res, next) => {
 
 /**
  * GET /board/:boardId
- * Lấy danh sách columns trong board:
- * - Board owner: thấy tất cả columns
- * - Còn lại: chỉ thấy các columns mình có trong memberIds (bất kể role)
+ * Lấy danh sách columns trong board
+ * ✅ Template board: ai cũng thấy toàn bộ columns, không cần check memberIds
  */
 const getColumnsByBoard = async (req, res, next) => {
   try {
@@ -184,21 +180,28 @@ const getColumnsByBoard = async (req, res, next) => {
       throwError(ERROR_MESSAGES.INVALID_ID, STATUS_CODES.BAD_REQUEST);
     }
 
-    const { board } = await validateUserAndBoardAccess(boardId, req.user.id, token);
+    // ✅ Dùng getAllBoardById — không check quyền, chỉ cần biết board.type và columnOrderIds
+    const board = await getAllBoardById(boardId, token);
+    if (!board) throwError(ERROR_MESSAGES.BOARD_NOT_FOUND, STATUS_CODES.NOT_FOUND);
 
     const allColumns = await Column.find({ boardId });
+    const orderedIds = board.columnOrderIds.map(id => id.toString());
+    const validColumns = allColumns
+      .filter(col => orderedIds.includes(col._id.toString()))
+      .sort((a, b) => orderedIds.indexOf(a._id.toString()) - orderedIds.indexOf(b._id.toString()));
 
-    // Lọc ra các column nằm trong columnOrderIds của board (đã hợp lệ)
-    const validColumns = allColumns.filter(col =>
-      board.columnOrderIds.includes(col._id.toString())
-    );
-
-    // Board owner thấy tất cả
-    if (board.userId.toString() === req.user.id) {
+    // ✅ Template board — trả về tất cả, không check memberIds
+    if (board.type === 'template') {
       return res.json(validColumns);
     }
 
-    // Các user khác chỉ thấy column họ có trong memberIds
+    // Board thường — validate quyền
+    const { board: checkedBoard } = await validateUserAndBoardAccess(boardId, req.user.id, token);
+
+    if (checkedBoard.userId.toString() === req.user.id) {
+      return res.json(validColumns);
+    }
+
     const accessibleColumns = validColumns.filter(col =>
       col.memberIds.some(m => m.userId.toString() === req.user.id)
     );
@@ -211,7 +214,8 @@ const getColumnsByBoard = async (req, res, next) => {
 
 /**
  * GET /:columnId
- * Lấy column theo ID — viewer trở lên (có trong memberIds) hoặc board owner
+ * Lấy column theo ID
+ * ✅ Template column: ai cũng xem được
  */
 const getColumnById = async (req, res, next) => {
   try {
@@ -223,18 +227,15 @@ const getColumnById = async (req, res, next) => {
     }
 
     const column = await Column.findById(columnId);
-    if (!column) {
-      throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
+    if (!column) throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
+
+    // ✅ Dùng getAllBoardById để check board.type mà không cần quyền membership
+    const board = await getAllBoardById(column.boardId, token);
+    if (board?.type === 'template') {
+      return res.json(column);
     }
 
-    const { board } = await validateUserAndBoardAccess(column.boardId, req.user.id, token);
-    const role = getUserColumnRole(column, board, req.user.id);
-
-    // Cần ít nhất viewer để xem column
-    // if (!hasMinRole(role, 'viewer')) {
-    //   throwError(ERROR_MESSAGES.NOT_INVITED_TO_COLUMN, STATUS_CODES.FORBIDDEN);
-    // }
-
+    await validateUserAndBoardAccess(column.boardId, req.user.id, token);
     res.json(column);
   } catch (error) {
     next(error);
@@ -243,7 +244,7 @@ const getColumnById = async (req, res, next) => {
 
 /**
  * GET /all/:columnId
- * Lấy column không kiểm tra quyền — dùng cho internal service call
+ * Internal endpoint — không check quyền
  */
 const getColumnByIdForAll = async (req, res, next) => {
   try {
@@ -254,9 +255,7 @@ const getColumnByIdForAll = async (req, res, next) => {
     }
 
     const column = await Column.findById(columnId);
-    if (!column) {
-      throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
-    }
+    if (!column) throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
 
     res.json(column);
   } catch (error) {
@@ -266,10 +265,7 @@ const getColumnByIdForAll = async (req, res, next) => {
 
 /**
  * PUT /:columnId/memberIds
- * Cập nhật danh sách member trong column.
- * Không check role vì đây là bước user accept invitation —
- * lúc này user chưa có role trong memberIds nên không thể check quyền trước.
- * Chỉ cần đã authenticate (qua authMiddleware) là được phép gọi.
+ * Cập nhật memberIds — dùng khi user accept invitation
  */
 const updateColumnMemberIds = async (req, res, next) => {
   try {
@@ -281,72 +277,13 @@ const updateColumnMemberIds = async (req, res, next) => {
     }
 
     const column = await Column.findById(columnId);
-    if (!column) {
-      throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
-    }
+    if (!column) throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
 
     column.memberIds = memberIds;
     column.updatedAt = Date.now();
     await column.save();
 
     res.json(column);
-  } catch (error) {
-    next(error);
-  }
-};
-
-const getTemplateBoards = async (req, res, next) => {
-  try {
-    const token = extractToken(req);
-    const user = await checkUserExists(req.user.id, token);
-    if (!user) throwError(ERROR_MESSAGES.USER_NOT_FOUND, STATUS_CODES.NOT_FOUND);
-
-    const templates = await Board.find({ type: 'template' })
-      .select('title description backgroundColor backgroundImage category columnOrderIds');
-
-    res.json(templates);
-  } catch (error) {
-    next(error);
-  }
-};
-
-const createBoardFromTemplate = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { title } = req.body;
-    const token = extractToken(req);
-
-    const user = await checkUserExists(req.user.id, token);
-    if (!user) throwError(ERROR_MESSAGES.USER_NOT_FOUND, STATUS_CODES.NOT_FOUND);
-
-    const template = await Board.findOne({ _id: id, type: 'template' });
-    if (!template) throwError('Template not found', STATUS_CODES.NOT_FOUND);
-
-    // Tạo board mới
-    const newBoard = new Board({
-      title: title || `Copy of ${template.title}`,
-      description: template.description,
-      backgroundColor: template.backgroundColor,
-      backgroundImage: template.backgroundImage,
-      userId: req.user.id,
-      memberIds: [],
-      columnOrderIds: [],
-      type: 'private',
-    });
-    await newBoard.save();
-
-    // Clone columns — gọi service
-    const clonedColumnIds = await cloneColumnsFromTemplate(
-      template._id,
-      template.columnOrderIds,
-      newBoard._id,
-      token
-    );
-
-    newBoard.columnOrderIds = clonedColumnIds;
-    await newBoard.save();
-
-    res.status(STATUS_CODES.CREATED).json(newBoard);
   } catch (error) {
     next(error);
   }
@@ -361,6 +298,4 @@ module.exports = {
   getColumnById,
   getColumnByIdForAll,
   updateColumnMemberIds,
-  getTemplateBoards,
-  createBoardFromTemplate,
 };

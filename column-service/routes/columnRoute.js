@@ -8,9 +8,7 @@ const {
   getColumnsByBoard,
   getColumnById,
   getColumnByIdForAll,
-  updateColumnMemberIds,
-  getTemplateBoards,
-  createBoardFromTemplate
+  updateColumnMemberIds
 } = require('../controllers/columnController');
 const validate = require('../middleware/validate');
 const errorHandler = require('../middleware/errorHandler');
@@ -25,8 +23,6 @@ router.delete('/:columnId', deleteColumn);
 router.get('/board/:boardId', getColumnsByBoard);
 router.get('/:columnId', getColumnById);
 router.get('/all/:columnId', getColumnByIdForAll);
-router.get('/templates/list', getTemplateBoards);
-router.post('/templates/:id', createBoardFromTemplate);
 
 router.use(errorHandler);
 
