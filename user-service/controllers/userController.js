@@ -349,6 +349,33 @@ const changeAvatarHandler = async (req, res, next) => {
   }
 };
 
+
+// ─────────────────────────────────────────────
+// DELETE USER — xoá account của chính mình
+// ─────────────────────────────────────────────
+const deleteUser = async (req, res, next) => {
+  try {
+    if (!req.user || !req.user.id) {
+      throwError(ERROR_MESSAGES.NO_TOKEN, STATUS_CODES.UNAUTHORIZED);
+    }
+
+    // Chỉ cho phép xoá chính mình, trừ khi là admin
+    const targetId = req.params.id;
+    if (targetId !== req.user.id) {
+      throwError(ERROR_MESSAGES.FORBIDDEN || 'You are not allowed to delete this account.', STATUS_CODES.FORBIDDEN);
+    }
+
+    const user = await User.findByIdAndDelete(targetId);
+    if (!user) {
+      throwError(ERROR_MESSAGES.USER_NOT_FOUND, STATUS_CODES.NOT_FOUND);
+    }
+
+    res.json({ message: 'Account deleted successfully.' });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
@@ -362,5 +389,6 @@ module.exports = {
   getAllUsers,
   getUserByEmail,
   authMiddleware,
-  changeAvatarHandler
+  changeAvatarHandler,
+  deleteUser
 };

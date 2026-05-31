@@ -15,6 +15,7 @@ const {
   forgotPassword,
   verifyForgotPasswordOTP,
   resetPassword,
+  deleteUser
 } = require('../controllers/userController');
 const validate = require('../middleware/validate');
 const errorHandler = require('../middleware/errorHandler');
@@ -34,7 +35,7 @@ router.get('/:id', authMiddleware, getUserById);
 router.get('/', authMiddleware, getAllUsers);
 router.post('/email', authMiddleware, getUserByEmail);
 router.post('/change-avatar', authMiddleware, upload.single('avatar'), changeAvatarHandler);
-
+router.delete('/:id', authMiddleware, deleteUser);
 router.use(errorHandler);
 
 module.exports = router;
