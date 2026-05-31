@@ -2,73 +2,140 @@ name: MicroService CI
 
 on:
   push:
-    push:
-      branches: [main]
-    pull_request:
-      branches: [main]
-jobs:
+    branches: [main]
+  pull_request:
+    branches: [main]
 
+jobs:
   detect-changes:
     uses: ./.github/workflows/detect-changes.yml
 
-  build-services:
+  # ============================================================
+  # USER SERVICE
+  # ============================================================
+  user-service:
+    name: User Service - Build & Push
     needs: detect-changes
-    if: ${{ needs.detect-changes.outputs.any_changed == 'true' }}
-    strategy:
-      matrix:
-        service: ${{ fromJson(needs.detect-changes.outputs.services_json) }}
-      fail-fast: false
-    name: Build ${{ matrix.service }}
-    uses: ./.github/workflows/build-service.yml
-    with:
-      service-name: ${{ matrix.service }}
-      package-lock-path: ${{ matrix.service }}/package-lock.json
-      output-dir: 'dist'
-
-  test-services:
-    needs: [detect-changes, build-services]
-    if: ${{ needs.detect-changes.outputs.any_changed == 'true' }}
-    strategy:
-      matrix:
-        service: ${{ fromJson(needs.detect-changes.outputs.services_json) }}
-      fail-fast: false
-    uses: ./.github/workflows/test-service.yml
-    with:
-      service-name: ${{ matrix.service }}
-      package-lock-path: ${{ matrix.service }}/package-lock.json
-  
-  sonarqube:
-    name: SonarQube Analysis
-    needs: [detect-changes, build-services, test-services]  # Optional: wait for builds if Sonar needs artifacts
-    if: ${{ needs.detect-changes.outputs.any_changed == 'true' }} # Only run if any service changed
-    uses: ./.github/workflows/sonarqube.yml
-    secrets:
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-    # with: {}  # Add if sonarqube.yml needs inputs (e.g., project-key)
-
-  trivy:
-    name: Trivy Vulnerability Scan
-    needs: [detect-changes, build-services, test-services, sonarqube]  # Wait for builds and Sonar (skip scan if Sonar fails?)
-    if: ${{ needs.detect-changes.outputs.any_changed == 'true' }} # Only run if any service changed
-    uses: ./.github/workflows/trivy.yml
-    with:
-      services: "${{ needs.detect-changes.outputs.services_list || 'none' }}"  # Pass empty string if no services changed
-
-  # Optional: Final summary job (e.g., report overall status)
-  summary:
-    name: CI Summary
+    if: ${{ contains(needs.detect-changes.outputs.services_json, 'user-service') }}
     runs-on: ubuntu-latest
-    needs: [detect-changes ,build-services, test-services, sonarqube, trivy]
-    if: always()
     steps:
-      - run: |
-          echo "Changed Services:"
-          echo "Board Service: ${{ needs.detect-changes.outputs.board-service }}"
-          echo "Card Service: ${{ needs.detect-changes.outputs.card-service }}"
-          echo "Column Service: ${{ needs.detect-changes.outputs.column-service }}"
-          echo "Notification Service: ${{ needs.detect-changes.outputs.notification-service }}"
-          echo "User Service: ${{ needs.detect-changes.outputs.user-service }}"
-          echo "Any Changed: ${{ needs.detect-changes.outputs.any_changed }}"
-          echo "Build: ${{ needs.build-services.result }}"
-          echo "Sonar: ${{ needs.sonarqube.result }}"
-          echo "Trivy: ${{ needs.trivy.result }}"
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build & Push
+        run: |
+          docker build -t thuan410/user-service:latest \
+                       -t thuan410/user-service:${{ github.sha }} \
+                       ./user-service
+          docker push thuan410/user-service:latest
+          docker push thuan410/user-service:${{ github.sha }}
+
+  # ============================================================
+  # BOARD SERVICE
+  # ============================================================
+  board-service:
+    name: Board Service - Build & Push
+    needs: detect-changes
+    if: ${{ contains(needs.detect-changes.outputs.services_json, 'board-service') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build & Push
+        run: |
+          docker build -t thuan410/board-service:latest \
+                       -t thuan410/board-service:${{ github.sha }} \
+                       ./board-service
+          docker push thuan410/board-service:latest
+          docker push thuan410/board-service:${{ github.sha }}
+
+  # ============================================================
+  # COLUMN SERVICE
+  # ============================================================
+  column-service:
+    name: Column Service - Build & Push
+    needs: detect-changes
+    if: ${{ contains(needs.detect-changes.outputs.services_json, 'column-service') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build & Push
+        run: |
+          docker build -t thuan410/column-service:latest \
+                       -t thuan410/column-service:${{ github.sha }} \
+                       ./column-service
+          docker push thuan410/column-service:latest
+          docker push thuan410/column-service:${{ github.sha }}
+
+  # ============================================================
+  # CARD SERVICE
+  # ============================================================
+  card-service:
+    name: Card Service - Build & Push
+    needs: detect-changes
+    if: ${{ contains(needs.detect-changes.outputs.services_json, 'card-service') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build & Push
+        run: |
+          docker build -t thuan410/card-service:latest \
+                       -t thuan410/card-service:${{ github.sha }} \
+                       ./card-service
+          docker push thuan410/card-service:latest
+          docker push thuan410/card-service:${{ github.sha }}
+
+  # ============================================================
+  # NOTIFICATION SERVICE
+  # ============================================================
+  notification-service:
+    name: Notification Service - Build & Push
+    needs: detect-changes
+    if: ${{ contains(needs.detect-changes.outputs.services_json, 'notification-service') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build & Push
+        run: |
+          docker build -t thuan410/notification-service:latest \
+                       -t thuan410/notification-service:${{ github.sha }} \
+                       ./notification-service
+          docker push thuan410/notification-service:latest
+          docker push thuan410/notification-service:${{ github.sha }}

@@ -5,34 +5,185 @@ on:
     branches: [production]
 
 jobs:
-
   detect-changes:
     uses: ./.github/workflows/detect-changes.yml
 
-  docker-build-push:
-    name: Build & Push Docker Images
+  # ============================================================
+  # USER SERVICE
+  # ============================================================
+  user-service:
+    name: User Service - Deploy
     needs: detect-changes
-    if: ${{ needs.detect-changes.outputs.any_changed == 'true' }}
+    if: ${{ contains(needs.detect-changes.outputs.services_json, 'user-service') }}
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        service: ${{ fromJson(needs.detect-changes.outputs.services_json) }}
-      fail-fast: false
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.0.3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          script: |
+            docker network create microservice-network 2>/dev/null || true
+            mkdir -p /home/thuantv/project/envs
 
-      - name: Build & Push ${{ matrix.service }}
-        run: |
-          cd ${{ matrix.service }}
-          docker build -t thuan410/${{ matrix.service }}:latest .
-          docker build -t thuan410/${{ matrix.service }}:${{ github.sha }} .
-          docker push thuan410/${{ matrix.service }}:latest
-          docker push thuan410/${{ matrix.service }}:${{ github.sha }}
+            cat > /home/thuantv/project/envs/user-service.env << 'EOF'
+            ${{ secrets.ENV_USER_SERVICE }}
+            EOF
+
+            docker pull thuan410/user-service:${{ github.sha }}
+            docker stop user-service || true
+            docker rm user-service || true
+            docker run -d \
+              --name user-service \
+              --restart unless-stopped \
+              --network microservice-network \
+              -p 3001:3001 \
+              --env-file /home/thuantv/project/envs/user-service.env \
+              thuan410/user-service:${{ github.sha }}
+            echo "✅ user-service deployed!"
+
+  # ============================================================
+  # BOARD SERVICE
+  # ============================================================
+  board-service:
+    name: Board Service - Deploy
+    needs: detect-changes
+    if: ${{ contains(needs.detect-changes.outputs.services_json, 'board-service') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          script: |
+            docker network create microservice-network 2>/dev/null || true
+            mkdir -p /home/thuantv/project/envs
+
+            cat > /home/thuantv/project/envs/board-service.env << 'EOF'
+            ${{ secrets.ENV_BOARD_SERVICE }}
+            EOF
+
+            docker pull thuan410/board-service:${{ github.sha }}
+            docker stop board-service || true
+            docker rm board-service || true
+            docker run -d \
+              --name board-service \
+              --restart unless-stopped \
+              --network microservice-network \
+              -p 3002:3002 \
+              --env-file /home/thuantv/project/envs/board-service.env \
+              thuan410/board-service:${{ github.sha }}
+            echo "✅ board-service deployed!"
+
+  # ============================================================
+  # COLUMN SERVICE
+  # ============================================================
+  column-service:
+    name: Column Service - Deploy
+    needs: detect-changes
+    if: ${{ contains(needs.detect-changes.outputs.services_json, 'column-service') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          script: |
+            docker network create microservice-network 2>/dev/null || true
+            mkdir -p /home/thuantv/project/envs
+
+            cat > /home/thuantv/project/envs/column-service.env << 'EOF'
+            ${{ secrets.ENV_COLUMN_SERVICE }}
+            EOF
+
+            docker pull thuan410/column-service:${{ github.sha }}
+            docker stop column-service || true
+            docker rm column-service || true
+            docker run -d \
+              --name column-service \
+              --restart unless-stopped \
+              --network microservice-network \
+              -p 3003:3003 \
+              --env-file /home/thuantv/project/envs/column-service.env \
+              thuan410/column-service:${{ github.sha }}
+            echo "✅ column-service deployed!"
+
+  # ============================================================
+  # CARD SERVICE
+  # ============================================================
+  card-service:
+    name: Card Service - Deploy
+    needs: detect-changes
+    if: ${{ contains(needs.detect-changes.outputs.services_json, 'card-service') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          script: |
+            docker network create microservice-network 2>/dev/null || true
+            mkdir -p /home/thuantv/project/envs
+
+            cat > /home/thuantv/project/envs/card-service.env << 'EOF'
+            ${{ secrets.ENV_CARD_SERVICE }}
+            EOF
+
+            docker pull thuan410/card-service:${{ github.sha }}
+            docker stop card-service || true
+            docker rm card-service || true
+            docker run -d \
+              --name card-service \
+              --restart unless-stopped \
+              --network microservice-network \
+              -p 3004:3004 \
+              --env-file /home/thuantv/project/envs/card-service.env \
+              thuan410/card-service:${{ github.sha }}
+            echo "✅ card-service deployed!"
+
+  # ============================================================
+  # NOTIFICATION SERVICE
+  # ============================================================
+  notification-service:
+    name: Notification Service - Deploy
+    needs: detect-changes
+    if: ${{ contains(needs.detect-changes.outputs.services_json, 'notification-service') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          script: |
+            docker network create microservice-network 2>/dev/null || true
+            mkdir -p /home/thuantv/project/envs
+
+            cat > /home/thuantv/project/envs/notification-service.env << 'EOF'
+            ${{ secrets.ENV_NOTIFICATION_SERVICE }}
+            EOF
+
+            docker pull thuan410/notification-service:${{ github.sha }}
+            docker stop notification-service || true
+            docker rm notification-service || true
+            docker run -d \
+              --name notification-service \
+              --restart unless-stopped \
+              --network microservice-network \
+              -p 3005:3005 \
+              --env-file /home/thuantv/project/envs/notification-service.env \
+              thuan410/notification-service:${{ github.sha }}
+            echo "✅ notification-service deployed!"
