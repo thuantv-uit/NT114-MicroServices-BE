@@ -9,6 +9,11 @@ const columnSchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     role: { type: String, required: true, enum: ['admin', 'member', 'viewer'] }
   }],
+  type: { 
+    type: String, 
+      enum: ['private', 'public', 'template'], 
+      default: 'private' 
+  },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });

@@ -12,7 +12,7 @@ const cardSchema = new mongoose.Schema({
     required: true 
   },
   image: { type: String, default: '' },
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: false, default: null },
   deadline: { type: Date, required: false, default: null },
   comments: [{
     text: { type: String, required: true },

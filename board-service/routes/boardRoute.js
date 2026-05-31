@@ -10,7 +10,10 @@ const {
   authMiddleware,
   allUserGetBoard,
   getLatestBoardId,
-  updateBoardMemberIds
+  updateBoardMemberIds,
+  getTemplateBoards,
+  createBoardFromTemplate,
+  getTemplateBoardById
 } = require('../controllers/boardController');
 const validate = require('../middleware/validate');
 const errorHandler = require('../middleware/errorHandler');
@@ -19,6 +22,10 @@ const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
 router.use(authMiddleware);
+
+router.get('/templates/list', getTemplateBoards);
+router.get('/templates/:id', getTemplateBoardById);
+router.post('/templates/:id/clone', createBoardFromTemplate);
 
 router.post('/', validate(createBoardSchema), createBoard);
 router.get('/list', getBoards);

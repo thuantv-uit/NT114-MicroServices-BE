@@ -1,13 +1,28 @@
 const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 const Column = require('../models/columnModel');
+const { updateBoardColumnOrder, getAllBoardById } = require('../services/board');
 const { extractToken, throwError, isValidObjectId } = require('../utils/helpers');
-const { updateBoardColumnOrder } = require('../services/board');
-const { checkColumnInvitation } = require('../services/invitation');
 const { validateUserAndBoardAccess } = require('../utils/permissions');
 const { STATUS_CODES, ERROR_MESSAGES } = require('../utils/constants');
 
-// Middleware xác thực token
+// ─── Role Helpers ────────────────────────────────────────────────────────────
+
+const getUserColumnRole = (column, board, userId) => {
+  if (board.userId.toString() === userId) return 'owner';
+  const member = column.memberIds.find(m => m.userId.toString() === userId);
+  return member ? member.role : null;
+};
+
+const ROLE_HIERARCHY = { owner: 4, admin: 3, member: 2, viewer: 1 };
+
+const hasMinRole = (role, minRole) => {
+  if (!role) return false;
+  return (ROLE_HIERARCHY[role] || 0) >= (ROLE_HIERARCHY[minRole] || 0);
+};
+
+// ─── Auth Middleware ─────────────────────────────────────────────────────────
+
 const authMiddleware = (req, res, next) => {
   const token = extractToken(req);
   if (!token) {
@@ -22,14 +37,28 @@ const authMiddleware = (req, res, next) => {
   }
 };
 
+// ─── Controllers ─────────────────────────────────────────────────────────────
+
+/**
+ * POST /
+ * Tạo column mới — chỉ board owner
+ * ✅ Không cho phép tạo column trong template board
+ */
 const createColumn = async (req, res, next) => {
   try {
     const { title, boardId, backgroundColor } = req.body;
     const token = extractToken(req);
+
     if (!isValidObjectId(boardId)) {
       throwError(ERROR_MESSAGES.INVALID_ID, STATUS_CODES.BAD_REQUEST);
     }
+
     const { board } = await validateUserAndBoardAccess(boardId, req.user.id, token);
+
+    if (board.type === 'template') {
+      throwError('Cannot create columns in a template board', STATUS_CODES.FORBIDDEN);
+    }
+
     if (board.userId.toString() !== req.user.id) {
       throwError(ERROR_MESSAGES.NOT_BOARD_OWNER, STATUS_CODES.FORBIDDEN);
     }
@@ -46,34 +75,35 @@ const createColumn = async (req, res, next) => {
   }
 };
 
-// need to fix 
+/**
+ * PUT /:columnId
+ * Cập nhật column — member trở lên
+ * ✅ Không cho phép sửa column trong template board
+ */
 const updateColumn = async (req, res, next) => {
   try {
     const { columnId } = req.params;
-    const { title, backgroundColor, cardOrderIds} = req.body;
+    const { title, backgroundColor, cardOrderIds } = req.body;
     const token = extractToken(req);
+
     if (!isValidObjectId(columnId)) {
       throwError(ERROR_MESSAGES.INVALID_COLUMN_ID, STATUS_CODES.BAD_REQUEST);
     }
+
     const column = await Column.findById(columnId);
-    if (!column) {
-      throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
-    }
+    if (!column) throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
+
     const { board } = await validateUserAndBoardAccess(column.boardId, req.user.id, token);
 
-    // Kiểm tra quyền: chủ sở hữu bảng hoặc người được mời vào cột
-    const isBoardOwner = board.userId.toString() === req.user.id;
-    let hasColumnAccess = false;
-    if (!isBoardOwner) {
-      const columnInvitations = await checkColumnInvitation(null, columnId, req.user.id, token);
-      hasColumnAccess = columnInvitations.some(inv => inv.status === 'accepted');
+    if (board.type === 'template') {
+      throwError('Cannot update columns in a template board', STATUS_CODES.FORBIDDEN);
     }
 
-    if (!isBoardOwner && !hasColumnAccess) {
+    const role = getUserColumnRole(column, board, req.user.id);
+    if (!hasMinRole(role, 'member')) {
       throwError(ERROR_MESSAGES.NOT_INVITED_TO_COLUMN, STATUS_CODES.FORBIDDEN);
     }
 
-    // Kiểm tra cardOrderIds nếu được gửi
     if (cardOrderIds !== undefined) {
       if (!Array.isArray(cardOrderIds)) {
         throwError('cardOrderIds phải là một mảng', STATUS_CODES.BAD_REQUEST);
@@ -90,26 +120,38 @@ const updateColumn = async (req, res, next) => {
     column.cardOrderIds = cardOrderIds !== undefined ? cardOrderIds : column.cardOrderIds;
     column.updatedAt = Date.now();
     await column.save();
+
     res.json(column);
   } catch (error) {
     next(error);
   }
 };
 
+/**
+ * DELETE /:columnId
+ * Xóa column — admin hoặc board owner
+ * ✅ Không cho phép xóa column trong template board
+ */
 const deleteColumn = async (req, res, next) => {
   try {
     const { columnId } = req.params;
     const token = extractToken(req);
+
     if (!isValidObjectId(columnId)) {
       throwError(ERROR_MESSAGES.INVALID_COLUMN_ID, STATUS_CODES.BAD_REQUEST);
     }
+
     const column = await Column.findById(columnId);
-    if (!column) {
-      throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
-    }
+    if (!column) throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
+
     const { board } = await validateUserAndBoardAccess(column.boardId, req.user.id, token);
-    // Chỉ board owner được xóa column
-    if (board.userId.toString() !== req.user.id) {
+
+    if (board.type === 'template') {
+      throwError('Cannot delete columns in a template board', STATUS_CODES.FORBIDDEN);
+    }
+
+    const role = getUserColumnRole(column, board, req.user.id);
+    if (!hasMinRole(role, 'admin')) {
       throwError(ERROR_MESSAGES.NOT_BOARD_OWNER, STATUS_CODES.FORBIDDEN);
     }
 
@@ -124,75 +166,96 @@ const deleteColumn = async (req, res, next) => {
   }
 };
 
+/**
+ * GET /board/:boardId
+ * Lấy danh sách columns trong board
+ * ✅ Template board: ai cũng thấy toàn bộ columns, không cần check memberIds
+ */
 const getColumnsByBoard = async (req, res, next) => {
   try {
     const { boardId } = req.params;
     const token = extractToken(req);
+
     if (!isValidObjectId(boardId)) {
       throwError(ERROR_MESSAGES.INVALID_ID, STATUS_CODES.BAD_REQUEST);
     }
-    const { board } = await validateUserAndBoardAccess(boardId, req.user.id, token);
+
+    // ✅ Dùng getAllBoardById — không check quyền, chỉ cần biết board.type và columnOrderIds
+    const board = await getAllBoardById(boardId, token);
+    if (!board) throwError(ERROR_MESSAGES.BOARD_NOT_FOUND, STATUS_CODES.NOT_FOUND);
 
     const allColumns = await Column.find({ boardId });
+    const orderedIds = board.columnOrderIds.map(id => id.toString());
+    const validColumns = allColumns
+      .filter(col => orderedIds.includes(col._id.toString()))
+      .sort((a, b) => orderedIds.indexOf(a._id.toString()) - orderedIds.indexOf(b._id.toString()));
 
-    const validColumns = allColumns.filter(col => board.columnOrderIds.includes(col._id.toString()));
-
-    if (board.userId.toString() === req.user.id) {
+    // ✅ Template board — trả về tất cả, không check memberIds
+    if (board.type === 'template') {
       return res.json(validColumns);
     }
 
-    const columnInvitations = await checkColumnInvitation(boardId, null, req.user.id, token);
-    const allowedColumnIds = columnInvitations ? columnInvitations.map(inv => inv.columnId.toString()) : [];
-    const allowedColumns = validColumns.filter(col => allowedColumnIds.includes(col._id.toString()));
-    res.json(allowedColumns);
+    // Board thường — validate quyền
+    const { board: checkedBoard } = await validateUserAndBoardAccess(boardId, req.user.id, token);
+
+    if (checkedBoard.userId.toString() === req.user.id) {
+      return res.json(validColumns);
+    }
+
+    const accessibleColumns = validColumns.filter(col =>
+      col.memberIds.some(m => m.userId.toString() === req.user.id)
+    );
+
+    res.json(accessibleColumns);
   } catch (error) {
     next(error);
   }
 };
 
+/**
+ * GET /:columnId
+ * Lấy column theo ID
+ * ✅ Template column: ai cũng xem được
+ */
 const getColumnById = async (req, res, next) => {
   try {
     const { columnId } = req.params;
     const token = extractToken(req);
+
     if (!isValidObjectId(columnId)) {
       throwError(ERROR_MESSAGES.INVALID_COLUMN_ID, STATUS_CODES.BAD_REQUEST);
     }
+
     const column = await Column.findById(columnId);
-    if (!column) {
-      throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
-    }
-    const { board } = await validateUserAndBoardAccess(column.boardId, req.user.id, token);
+    if (!column) throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
 
-    if (board.userId.toString() !== req.user.id) {
-      const columnInvitations = await checkColumnInvitation(column.boardId, columnId, req.user.id, token);
-      const hasInvitation = columnInvitations.some(inv => inv.columnId.toString() === columnId);
-      if (!hasInvitation) {
-        throwError(ERROR_MESSAGES.NOT_INVITED_TO_COLUMN, STATUS_CODES.FORBIDDEN);
-      }
+    // ✅ Dùng getAllBoardById để check board.type mà không cần quyền membership
+    const board = await getAllBoardById(column.boardId, token);
+    if (board?.type === 'template') {
+      return res.json(column);
     }
 
+    await validateUserAndBoardAccess(column.boardId, req.user.id, token);
     res.json(column);
   } catch (error) {
     next(error);
   }
 };
 
+/**
+ * GET /all/:columnId
+ * Internal endpoint — không check quyền
+ */
 const getColumnByIdForAll = async (req, res, next) => {
   try {
     const { columnId } = req.params;
-    const token = extractToken(req);
+
     if (!isValidObjectId(columnId)) {
       throwError(ERROR_MESSAGES.INVALID_COLUMN_ID, STATUS_CODES.BAD_REQUEST);
     }
+
     const column = await Column.findById(columnId);
-    if (!column) {
-      throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
-    }
-    // Chỉ kiểm tra user tồn tại, không kiểm tra quyền truy cập
-    // const user = await checkUserExists(req.user.id, token);
-    // if (!user) {
-    //   throwError(ERROR_MESSAGES.USER_NOT_FOUND, STATUS_CODES.NOT_FOUND);
-    // }
+    if (!column) throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
 
     res.json(column);
   } catch (error) {
@@ -200,24 +263,26 @@ const getColumnByIdForAll = async (req, res, next) => {
   }
 };
 
+/**
+ * PUT /:columnId/memberIds
+ * Cập nhật memberIds — dùng khi user accept invitation
+ */
 const updateColumnMemberIds = async (req, res, next) => {
   try {
     const { columnId } = req.params;
     const { memberIds } = req.body;
-    const token = extractToken(req);
+
     if (!isValidObjectId(columnId)) {
       throwError(ERROR_MESSAGES.INVALID_COLUMN_ID, STATUS_CODES.BAD_REQUEST);
     }
-    const column = await Column.findById(columnId);
-    if (!column) {
-      throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
-    }
-    const { board } = await validateUserAndBoardAccess(column.boardId, req.user.id, token);
 
-    // Bất kỳ người dùng đã xác thực nào có thể cập nhật memberIds
+    const column = await Column.findById(columnId);
+    if (!column) throwError(ERROR_MESSAGES.NOT_FOUND_COLUMN, STATUS_CODES.NOT_FOUND);
+
     column.memberIds = memberIds;
     column.updatedAt = Date.now();
     await column.save();
+
     res.json(column);
   } catch (error) {
     next(error);
@@ -232,5 +297,5 @@ module.exports = {
   getColumnsByBoard,
   getColumnById,
   getColumnByIdForAll,
-  updateColumnMemberIds
+  updateColumnMemberIds,
 };
