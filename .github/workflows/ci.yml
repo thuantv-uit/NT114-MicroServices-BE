@@ -16,7 +16,7 @@ jobs:
   user-service:
     name: User Service - Build & Push
     needs: detect-changes
-    if: ${{ contains(needs.detect-changes.outputs.services_json, 'user-service') }}
+    if: ${{ github.event_name == 'push' && contains(needs.detect-changes.outputs.services_json, 'user-service') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -42,7 +42,7 @@ jobs:
   board-service:
     name: Board Service - Build & Push
     needs: detect-changes
-    if: ${{ contains(needs.detect-changes.outputs.services_json, 'board-service') }}
+    if: ${{ github.event_name == 'push' && contains(needs.detect-changes.outputs.services_json, 'board-service') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -68,7 +68,7 @@ jobs:
   column-service:
     name: Column Service - Build & Push
     needs: detect-changes
-    if: ${{ contains(needs.detect-changes.outputs.services_json, 'column-service') }}
+    if: ${{ github.event_name == 'push' && contains(needs.detect-changes.outputs.services_json, 'column-service') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -94,7 +94,7 @@ jobs:
   card-service:
     name: Card Service - Build & Push
     needs: detect-changes
-    if: ${{ contains(needs.detect-changes.outputs.services_json, 'card-service') }}
+    if: ${{ github.event_name == 'push' && contains(needs.detect-changes.outputs.services_json, 'card-service') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -120,7 +120,7 @@ jobs:
   notification-service:
     name: Notification Service - Build & Push
     needs: detect-changes
-    if: ${{ contains(needs.detect-changes.outputs.services_json, 'notification-service') }}
+    if: ${{ github.event_name == 'push' && contains(needs.detect-changes.outputs.services_json, 'notification-service') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
