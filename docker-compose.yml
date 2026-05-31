@@ -1,72 +1,100 @@
 version: '3.8'
 
 services:
-  # Microservice: invitation
-  invitation:
-    build:
-      context: ./notification-service
-    image: nt114-microservice-be-invitation:latest
-    ports:
-      - "3005:3005"
-    environment:
-      - MONGO_URI=mongodb+srv://thuantv:22521448@cluster0.nopqraq.mongodb.net/
-      - DATABASE_NAME=NT114
-    networks:
-      - app-network
-
-  # Microservice: card
-  card:
-    build:
-      context: ./card-service
-    image: nt114-microservice-be-card:latest
-    ports:
-      - "3004:3004"
-    environment:
-      - MONGO_URI=mongodb+srv://thuantv:22521448@cluster0.nopqraq.mongodb.net/
-      - DATABASE_NAME=NT114
-    networks:
-      - app-network
-
-  # Microservice: column
-  column:
-    build:
-      context: ./column-service
-    image: nt114-microservice-be-column:latest
-    ports:
-      - "3003:3003"
-    environment:
-      - MONGO_URI=mongodb+srv://thuantv:22521448@cluster0.nopqraq.mongodb.net/
-      - DATABASE_NAME=NT114
-    networks:
-      - app-network
-
-  # Microservice: board
-  board:
-    build:
-      context: ./board-service
-    image: nt114-microservice-be-board:latest
-    ports:
-      - "3002:3002"
-    environment:
-      - MONGO_URI=mongodb+srv://thuantv:22521448@cluster0.nopqraq.mongodb.net/
-      - DATABASE_NAME=NT114
-    networks:
-      - app-network
-
-  # Microservice: user
   user:
     build:
       context: ./user-service
-    image: nt114-microservice-be-user:latest
+      dockerfile: Dockerfile
+    container_name: nt114-user-service
     ports:
       - "3001:3001"
-    environment:
-      - MONGO_URI=mongodb+srv://thuantv:22521448@cluster0.nopqraq.mongodb.net/
-      - DATABASE_NAME=NT114
+    env_file:
+      - ./user-service/.env
     networks:
       - app-network
+    restart: unless-stopped
 
-# Định nghĩa network để các container giao tiếp với nhau
+  board:
+    build:
+      context: ./board-service
+      dockerfile: Dockerfile
+    container_name: nt114-board-service
+    ports:
+      - "3002:3002"
+    env_file:
+      - ./board-service/.env
+    environment:
+      - USER_SERVICE_URL=http://user:3001
+      - COLUMN_SERVICE_URL=http://column:3003
+      - CARD_SERVICE_URL=http://card:3004
+      - INVITATION_SERVICE_URL=http://invitation:3005
+    depends_on:
+      - user
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  column:
+    build:
+      context: ./column-service
+      dockerfile: Dockerfile
+    container_name: nt114-column-service
+    ports:
+      - "3003:3003"
+    env_file:
+      - ./column-service/.env
+    environment:
+      - USER_SERVICE_URL=http://user:3001
+      - BOARD_SERVICE_URL=http://board:3002
+      - INVITATION_SERVICE_URL=http://invitation:3005
+    depends_on:
+      - user
+      - board
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  card:
+    build:
+      context: ./card-service
+      dockerfile: Dockerfile
+    container_name: nt114-card-service
+    ports:
+      - "3004:3004"
+    env_file:
+      - ./card-service/.env
+    environment:
+      - USER_SERVICE_URL=http://user:3001
+      - BOARD_SERVICE_URL=http://board:3002
+      - COLUMN_SERVICE_URL=http://column:3003
+      - INVITATION_SERVICE_URL=http://invitation:3005
+    depends_on:
+      - user
+      - column
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  invitation:
+    build:
+      context: ./notification-service
+      dockerfile: Dockerfile
+    container_name: nt114-invitation-service
+    ports:
+      - "3005:3005"
+    env_file:
+      - ./notification-service/.env
+    environment:
+      - USER_SERVICE_URL=http://user:3001
+      - BOARD_SERVICE_URL=http://board:3002
+      - COLUMN_SERVICE_URL=http://column:3003
+      - CARD_SERVICE_URL=http://card:3004
+    depends_on:
+      - user
+    networks:
+      - app-network
+    restart: unless-stopped
+
 networks:
   app-network:
     driver: bridge

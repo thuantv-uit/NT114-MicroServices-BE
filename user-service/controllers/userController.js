@@ -3,7 +3,7 @@ const User = require('../models/userModel');
 const { throwError, extractToken } = require('../utils/helpers');
 const { STATUS_CODES, ERROR_MESSAGES } = require('../utils/constants');
 const { streamUpload } = require('../config/CloudinaryProvider');
-const { generateOTP, generateOTPExpiry, sendOTPEmail } = require('../service/otpService');
+const { generateOTP, generateOTPExpiry, sendOTPEmail } = require('../service/Otpservice');
 
 // ─────────────────────────────────────────────
 // REGISTER — create user with active: false, send OTP
