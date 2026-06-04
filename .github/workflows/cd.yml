@@ -49,6 +49,7 @@ jobs:
             docker network create shared-network 2>/dev/null || true
 
             docker compose -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.prod.yml down
             docker compose -f docker-compose.prod.yml up -d
 
             echo "✅ All services deployed!"
