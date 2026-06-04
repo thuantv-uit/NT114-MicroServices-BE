@@ -11,24 +11,20 @@ services:
     restart: unless-stopped
 
   user:
-    build:
-      context: ./user-service
-      dockerfile: Dockerfile
+    image: thuan410/user-service:latest
     container_name: nt114-user-service
     env_file:
-      - ./user-service/.env
+      - ./envs/user-service.env
     networks:
       - app-network
       - shared-network
     restart: unless-stopped
 
   board:
-    build:
-      context: ./board-service
-      dockerfile: Dockerfile
+    image: thuan410/board-service:latest
     container_name: nt114-board-service
     env_file:
-      - ./board-service/.env
+      - ./envs/board-service.env
     environment:
       - USER_SERVICE_URL=http://user:3001
       - COLUMN_SERVICE_URL=http://column:3003
@@ -42,12 +38,10 @@ services:
     restart: unless-stopped
 
   column:
-    build:
-      context: ./column-service
-      dockerfile: Dockerfile
+    image: thuan410/column-service:latest
     container_name: nt114-column-service
     env_file:
-      - ./column-service/.env
+      - ./envs/column-service.env
     environment:
       - USER_SERVICE_URL=http://user:3001
       - BOARD_SERVICE_URL=http://board:3002
@@ -61,12 +55,10 @@ services:
     restart: unless-stopped
 
   card:
-    build:
-      context: ./card-service
-      dockerfile: Dockerfile
+    image: thuan410/card-service:latest
     container_name: nt114-card-service
     env_file:
-      - ./card-service/.env
+      - ./envs/card-service.env
     environment:
       - USER_SERVICE_URL=http://user:3001
       - BOARD_SERVICE_URL=http://board:3002
@@ -81,12 +73,10 @@ services:
     restart: unless-stopped
 
   invitation:
-    build:
-      context: ./notification-service
-      dockerfile: Dockerfile
+    image: thuan410/notification-service:latest
     container_name: nt114-invitation-service
     env_file:
-      - ./notification-service/.env
+      - ./envs/notification-service.env
     environment:
       - USER_SERVICE_URL=http://user:3001
       - BOARD_SERVICE_URL=http://board:3002
