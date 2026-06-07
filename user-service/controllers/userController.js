@@ -14,6 +14,19 @@ const registerUser = async (req, res, next) => {
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
+      // 🆕 Nếu email đã đăng ký bằng Google thì báo rõ
+      if (existingUser.authType === 'google') {
+        throwError(
+          'Email này đã được đăng ký bằng Google. Vui lòng dùng nút "Đăng nhập với Google".',
+          STATUS_CODES.BAD_REQUEST
+        );
+      }
+      if (existingUser.authType === 'github') {
+        throwError(
+          'Email này đã được đăng ký bằng GitHub. Vui lòng dùng nút "Login with GitHub".',
+          STATUS_CODES.BAD_REQUEST
+        );
+      }
       throwError(ERROR_MESSAGES.USER_ALREADY_EXISTS, STATUS_CODES.BAD_REQUEST);
     }
 
@@ -26,6 +39,7 @@ const registerUser = async (req, res, next) => {
       password,
       avatar,
       active: false,
+      authType: 'local',
       otp,
       otpExpiry
     });
@@ -121,7 +135,26 @@ const loginUser = async (req, res, next) => {
     const { email, password } = req.body;
 
     const user = await User.findOne({ email });
-    if (!user || !(await user.comparePassword(password))) {
+    if (!user) {
+      throwError(ERROR_MESSAGES.INVALID_CREDENTIALS, STATUS_CODES.BAD_REQUEST);
+    }
+
+    // 🆕 Guard: tài khoản Google không thể login bằng password
+    if (user.authType === 'google') {
+      throwError(
+        'This account logs in using Google. Please use the "Sign in with Google" button.',
+        STATUS_CODES.BAD_REQUEST
+      );
+    }
+    // 🆕 Guard: tài khoản GitHub không thể login bằng password
+    if (user.authType === 'github') {
+      throwError(
+        'This account logs in using GitHub. Please use the "Sign in with GitHub" button.',
+        STATUS_CODES.BAD_REQUEST
+      );
+    }
+
+    if (!(await user.comparePassword(password))) {
       throwError(ERROR_MESSAGES.INVALID_CREDENTIALS, STATUS_CODES.BAD_REQUEST);
     }
 
@@ -157,6 +190,21 @@ const forgotPassword = async (req, res, next) => {
     const user = await User.findOne({ email });
     if (!user) {
       throwError(ERROR_MESSAGES.USER_NOT_FOUND, STATUS_CODES.NOT_FOUND);
+    }
+
+    // 🆕 Google user không có password → không cần forgot password
+    if (user.authType === 'google') {
+      throwError(
+        'This account logs in using Google; there is no password to reset.',
+        STATUS_CODES.BAD_REQUEST
+      );
+    }
+    // 🆕 GitHub user không có password → không cần forgot password
+    if (user.authType === 'github') {
+      throwError(
+        'This account logs in using GitHub; there is no password to reset.',
+        STATUS_CODES.BAD_REQUEST
+      );
     }
 
     if (!user.active) {
@@ -205,10 +253,8 @@ const verifyForgotPasswordOTP = async (req, res, next) => {
       throwError('Invalid OTP.', STATUS_CODES.BAD_REQUEST);
     }
 
-    // OTP valid — clear it so reset-password step can proceed
-    // We keep otpExpiry as a short-lived "reset session" marker
     user.otp = undefined;
-    user.otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 min window to submit new password
+    user.otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
     await user.save();
 
     res.json({ message: 'OTP verified. You may now reset your password.' });
@@ -229,7 +275,6 @@ const resetPassword = async (req, res, next) => {
       throwError(ERROR_MESSAGES.USER_NOT_FOUND, STATUS_CODES.NOT_FOUND);
     }
 
-    // Check reset window is still valid (otpExpiry reused as reset session)
     if (!user.otpExpiry || new Date() > user.otpExpiry) {
       throwError(
         'Reset session has expired. Please start the forgot password process again.',
@@ -239,7 +284,7 @@ const resetPassword = async (req, res, next) => {
 
     user.password = newPassword;
     user.otpExpiry = undefined;
-    await user.save(); // pre-save hook will hash the new password
+    await user.save();
 
     res.json({ message: 'Password reset successfully. You can now log in.' });
   } catch (error) {
@@ -349,7 +394,6 @@ const changeAvatarHandler = async (req, res, next) => {
   }
 };
 
-
 // ─────────────────────────────────────────────
 // DELETE USER — xoá account của chính mình
 // ─────────────────────────────────────────────
@@ -359,7 +403,6 @@ const deleteUser = async (req, res, next) => {
       throwError(ERROR_MESSAGES.NO_TOKEN, STATUS_CODES.UNAUTHORIZED);
     }
 
-    // Chỉ cho phép xoá chính mình, trừ khi là admin
     const targetId = req.params.id;
     if (targetId !== req.user.id) {
       throwError(ERROR_MESSAGES.FORBIDDEN || 'You are not allowed to delete this account.', STATUS_CODES.FORBIDDEN);

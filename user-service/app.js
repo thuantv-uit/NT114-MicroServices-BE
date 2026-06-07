@@ -1,9 +1,14 @@
 const express = require('express');
 const cors = require('cors');
+const passport = require('passport');
 const connectDB = require('./config/database');
 const userRoutes = require('./routes/userRoute');
+const googleAuthRoute = require('./service/googleAuthRoute');
+const githubAuthRoute = require('./service/githubAuthRoute');
 const errorHandler = require('./middleware/errorHandler');
 require('dotenv').config();
+require('./service/Passport');
+
 
 const app = express();
 
@@ -13,7 +18,12 @@ const startServer = async () => {
     await connectDB();
     app.use(cors());
     app.use(express.json());
+    app.use(passport.initialize());
+
     app.use('/api/users', userRoutes);
+    app.use('/auth/google', googleAuthRoute);
+    app.use('/auth/github', githubAuthRoute);
+    
     app.use(errorHandler);
 
     const PORT = process.env.PORT || 3001;
