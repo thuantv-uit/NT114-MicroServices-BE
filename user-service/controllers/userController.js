@@ -21,6 +21,12 @@ const registerUser = async (req, res, next) => {
           STATUS_CODES.BAD_REQUEST
         );
       }
+      if (existingUser.authType === 'github') {
+        throwError(
+          'Email này đã được đăng ký bằng GitHub. Vui lòng dùng nút "Login with GitHub".',
+          STATUS_CODES.BAD_REQUEST
+        );
+      }
       throwError(ERROR_MESSAGES.USER_ALREADY_EXISTS, STATUS_CODES.BAD_REQUEST);
     }
 
@@ -33,7 +39,7 @@ const registerUser = async (req, res, next) => {
       password,
       avatar,
       active: false,
-      authType: 'local', // 🆕
+      authType: 'local',
       otp,
       otpExpiry
     });
@@ -140,6 +146,13 @@ const loginUser = async (req, res, next) => {
         STATUS_CODES.BAD_REQUEST
       );
     }
+    // 🆕 Guard: tài khoản GitHub không thể login bằng password
+    if (user.authType === 'github') {
+      throwError(
+        'This account logs in using GitHub. Please use the "Sign in with GitHub" button.',
+        STATUS_CODES.BAD_REQUEST
+      );
+    }
 
     if (!(await user.comparePassword(password))) {
       throwError(ERROR_MESSAGES.INVALID_CREDENTIALS, STATUS_CODES.BAD_REQUEST);
@@ -183,6 +196,13 @@ const forgotPassword = async (req, res, next) => {
     if (user.authType === 'google') {
       throwError(
         'This account logs in using Google; there is no password to reset.',
+        STATUS_CODES.BAD_REQUEST
+      );
+    }
+    // 🆕 GitHub user không có password → không cần forgot password
+    if (user.authType === 'github') {
+      throwError(
+        'This account logs in using GitHub; there is no password to reset.',
         STATUS_CODES.BAD_REQUEST
       );
     }

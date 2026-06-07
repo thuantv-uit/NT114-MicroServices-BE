@@ -18,9 +18,10 @@ const userSchema = new mongoose.Schema({
   avatar:    { type: String, default: '' },
   active:    { type: Boolean, default: false },
   googleId:  { type: String, sparse: true },
+  githubId: { type: String, sparse: true },
   authType:  {
     type: String,
-    enum: ['local', 'google'],
+    enum: ['local', 'google', 'github'],
     default: 'local'
   },
   otp:       { type: String },
@@ -39,7 +40,7 @@ userSchema.pre('save', async function (next) {
 
 userSchema.methods.comparePassword = async function (password) {
   if (this.authType !== 'local') {
-    throw new Error('This account logs in using Google. Please use the "Sign in with Google" button.');
+    throw new Error(`This account logs in using ${this.authType}. Please use the corresponding button.`);
   }
   return bcrypt.compare(password, this.password);
 };
