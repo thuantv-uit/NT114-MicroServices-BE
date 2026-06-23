@@ -7,12 +7,21 @@ require('dotenv').config();
 
 const app = express();
 
-// Kết nối MongoDB và xử lý lỗi
 const startServer = async () => {
   try {
     await connectDB();
     app.use(cors());
     app.use(express.json());
+
+    // ✅ Health check route
+    app.get('/health', (req, res) => {
+      res.status(200).json({
+        status: 'ok',
+        uptime: process.uptime(),
+        timestamp: new Date().toISOString(),
+      });
+    });
+
     app.use('/api/boards', boardRoutes);
     app.use(errorHandler);
 
@@ -22,13 +31,12 @@ const startServer = async () => {
     });
   } catch (error) {
     console.error(`Failed to start server: ${error.message}`);
-    process.exit(1); // Chỉ thoát nếu không thể khởi động server
+    process.exit(1);
   }
 };
 
 startServer();
 
-// Xử lý lỗi không được bắt
 process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error);
 });
@@ -37,5 +45,4 @@ process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
-
-// Test pipeline CI/CD part 6
+// Test pipeline CI/CD part 7
